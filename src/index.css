@@ -1,0 +1,101 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #1A1A2E;
+  background-color: #F5F0E8;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@layer components {
+  .font-serif-sc {
+    font-family: 'Noto Serif SC', 'Source Han Serif SC', Georgia, serif;
+  }
+
+  .card-theater {
+    @apply bg-white rounded-lg shadow-theater border border-gold-200/30;
+  }
+
+  .card-hover {
+    @apply transition-all duration-200 hover:shadow-theater-lg hover:-translate-y-0.5;
+  }
+
+  .btn-primary {
+    @apply bg-wine-600 text-white px-4 py-2 rounded-md font-medium
+           hover:bg-wine-700 active:bg-wine-800
+           transition-colors duration-200
+           border border-gold-400/30;
+  }
+
+  .btn-secondary {
+    @apply bg-cream-100 text-wine-700 px-4 py-2 rounded-md font-medium
+           hover:bg-cream-200 active:bg-cream-300
+           transition-colors duration-200
+           border border-gold-300/50;
+  }
+
+  .btn-ghost {
+    @apply text-wine-600 px-3 py-1.5 rounded-md font-medium
+           hover:bg-wine-50 transition-colors duration-200;
+  }
+
+  .gold-divider {
+    @apply h-px bg-gradient-to-r from-transparent via-gold-400/50 to-transparent;
+  }
+
+  .section-title {
+    @apply font-serif-sc text-lg font-semibold text-wine-700 flex items-center gap-2;
+  }
+
+  .gold-border {
+    @apply border border-gold-300/50;
+  }
+}
+
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #D4A574 transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #D4A574;
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #B47E45;
+  }
+
+  .text-shadow-gold {
+    text-shadow: 0 1px 2px rgba(212, 165, 116, 0.3);
+  }
+}
