@@ -12,6 +12,9 @@ import {
   Copy,
   Route,
   Calendar as CalendarIcon,
+  Truck,
+  Users,
+  Package,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -28,6 +31,8 @@ export default function CalendarPage() {
   const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1));
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'route'>('calendar');
+  const [showTransitionModal, setShowTransitionModal] = useState(false);
+  const [transitionPair, setTransitionPair] = useState<{ from: Show; to: Show } | null>(null);
   const [newShow, setNewShow] = useState({
     city: '',
     venue: '',
@@ -405,17 +410,23 @@ export default function CalendarPage() {
                               <div className="w-10 flex justify-center">
                                 <div className="w-0.5 h-4 bg-gold-300"></div>
                               </div>
-                              <div className="flex items-center gap-2 text-xs">
+                              <div className="flex items-center gap-2 text-xs flex-1">
                                 <div className="flex-1 h-px bg-gold-200"></div>
-                                <span className={`px-2 py-0.5 rounded-full font-medium ${
-                                  gapDays <= 2
-                                    ? 'bg-red-50 text-red-600 border border-red-200'
-                                    : gapDays <= 4
-                                    ? 'bg-amber-50 text-amber-600 border border-amber-200'
-                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
-                                }`}>
-                                  {gapDays} 天
-                                </span>
+                                <button
+                                  onClick={() => {
+                                    setTransitionPair({ from: show, to: sortedShows[index + 1] });
+                                    setShowTransitionModal(true);
+                                  }}
+                                  className={`px-3 py-1 rounded-full font-medium cursor-pointer hover:shadow-md transition-all border ${
+                                    gapDays <= 2
+                                      ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
+                                      : gapDays <= 4
+                                      ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100'
+                                      : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
+                                  }`}
+                                >
+                                  转场 {gapDays} 天
+                                </button>
                                 <div className="flex-1 h-px bg-gold-200"></div>
                               </div>
                             </div>
@@ -703,6 +714,168 @@ export default function CalendarPage() {
             </div>
           </div>
         </div>
+      </Modal>
+
+      <Modal
+        isOpen={showTransitionModal && transitionPair !== null}
+        onClose={() => setShowTransitionModal(false)}
+        title={transitionPair ? `${transitionPair.from.city} → ${transitionPair.to.city} 转场复盘` : '转场复盘'}
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowTransitionModal(false)}
+              className="btn-secondary"
+            >
+              关闭
+            </button>
+          </div>
+        }
+      >
+        {transitionPair && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between bg-gradient-to-r from-wine-50 to-gold-50 rounded-lg p-4 border border-gold-200/50">
+              <div className="text-right">
+                <p className="text-xs text-charcoal-400">上一站</p>
+                <p className="font-serif-sc text-xl font-bold text-wine-700">{transitionPair.from.city}</p>
+                <p className="text-sm text-charcoal-500">{transitionPair.from.venue}</p>
+              </div>
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 rounded-full bg-gold-400 flex items-center justify-center text-white mb-1">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <p className="text-sm font-medium text-gold-700">
+                  {getDaysBetween(transitionPair.from.date, transitionPair.to.date)} 天转场
+                </p>
+              </div>
+              <div className="text-left">
+                <p className="text-xs text-charcoal-400">下一站</p>
+                <p className="font-serif-sc text-xl font-bold text-wine-700">{transitionPair.to.city}</p>
+                <p className="text-sm text-charcoal-500">{transitionPair.to.venue}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Card>
+                <CardHeader>
+                  <SectionTitle
+                    icon={<Clock className="w-4 h-4 text-gold-500" />}
+                    title="上一站撤场"
+                  />
+                </CardHeader>
+                <CardBody className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-charcoal-400">演出日期</span>
+                    <p className="font-medium text-charcoal-700">{transitionPair.from.date}</p>
+                  </div>
+                  <div>
+                    <span className="text-charcoal-400">演出时间</span>
+                    <p className="font-medium text-charcoal-700">{transitionPair.from.startTime} - {transitionPair.from.endTime}</p>
+                  </div>
+                  <div>
+                    <span className="text-charcoal-400">撤场时间</span>
+                    <p className="font-medium text-wine-700">{transitionPair.from.loadOutTime}</p>
+                  </div>
+                </CardBody>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <SectionTitle
+                    icon={<CalendarDays className="w-4 h-4 text-gold-500" />}
+                    title="下一站进场"
+                  />
+                </CardHeader>
+                <CardBody className="space-y-3 text-sm">
+                  <div>
+                    <span className="text-charcoal-400">演出日期</span>
+                    <p className="font-medium text-charcoal-700">{transitionPair.to.date}</p>
+                  </div>
+                  <div>
+                    <span className="text-charcoal-400">演出时间</span>
+                    <p className="font-medium text-charcoal-700">{transitionPair.to.startTime} - {transitionPair.to.endTime}</p>
+                  </div>
+                  <div>
+                    <span className="text-charcoal-400">进场时间</span>
+                    <p className="font-medium text-emerald-700">{transitionPair.to.loadInTime}</p>
+                  </div>
+                </CardBody>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <SectionTitle
+                  icon={<Package className="w-4 h-4 text-gold-500" />}
+                  title="物料运输"
+                />
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm text-charcoal-500 mb-3">
+                  可用时间窗口：{transitionPair.from.date} 演出结束后 至 {transitionPair.to.date} 演出开始前
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="p-3 bg-cream-50 rounded-lg">
+                    <p className="text-2xl font-serif-sc font-bold text-wine-700">
+                      {getDaysBetween(transitionPair.from.date, transitionPair.to.date)}
+                    </p>
+                    <p className="text-xs text-charcoal-400">总天数</p>
+                  </div>
+                  <div className="p-3 bg-cream-50 rounded-lg">
+                    <p className="text-2xl font-serif-sc font-bold text-amber-700">
+                      {Math.max(0, getDaysBetween(transitionPair.from.date, transitionPair.to.date) - 1)}
+                    </p>
+                    <p className="text-xs text-charcoal-400">运输日</p>
+                  </div>
+                  <div className="p-3 bg-cream-50 rounded-lg">
+                    <p className="text-2xl font-serif-sc font-bold text-emerald-700">1</p>
+                    <p className="text-xs text-charcoal-400">搭建日</p>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <SectionTitle
+                  icon={<Users className="w-4 h-4 text-gold-500" />}
+                  title="人员转场"
+                />
+              </CardHeader>
+              <CardBody>
+                <div className="text-sm">
+                  <div className="flex justify-between py-2 border-b border-gold-100">
+                    <span className="text-charcoal-500">建议出发时间</span>
+                    <span className="font-medium text-charcoal-700">{transitionPair.from.date} 演出结束后</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-gold-100">
+                    <span className="text-charcoal-500">建议到达时间</span>
+                    <span className="font-medium text-charcoal-700">{transitionPair.to.loadInTime}</span>
+                  </div>
+                  <div className="flex justify-between py-2">
+                    <span className="text-charcoal-500">交通方式</span>
+                    <span className="font-medium text-wine-700">根据两城距离选择高铁/航班/大巴</span>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => navigate(`/shows/${transitionPair.from.id}`)}
+                className="flex-1 btn-secondary text-sm flex items-center justify-center gap-1"
+              >
+                查看 {transitionPair.from.city} 详情
+              </button>
+              <button
+                onClick={() => navigate(`/shows/${transitionPair.to.id}`)}
+                className="flex-1 btn-primary text-sm flex items-center justify-center gap-1"
+              >
+                查看 {transitionPair.to.city} 详情
+              </button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   );

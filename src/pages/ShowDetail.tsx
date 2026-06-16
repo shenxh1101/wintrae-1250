@@ -30,7 +30,7 @@ import {
   MaterialStatusBadge,
 } from '../components/StatusBadge';
 import Modal from '../components/Modal';
-import type { Personnel, Equipment, Issue, EquipmentCategory, ShowStatus, PersonnelType } from '../types';
+import type { Personnel, Equipment, Issue, EquipmentCategory, ShowStatus, PersonnelType, HandoverTemplate } from '../types';
 
 export default function ShowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -54,6 +54,9 @@ export default function ShowDetailPage() {
   const deleteEquipment = useTourStore((state) => state.deleteEquipment);
   const addVenuePhoto = useTourStore((state) => state.addVenuePhoto);
   const deleteVenuePhoto = useTourStore((state) => state.deleteVenuePhoto);
+  const handoverTemplates = useTourStore((state) => state.handoverTemplates);
+  const addHandoverTemplate = useTourStore((state) => state.addHandoverTemplate);
+  const deleteHandoverTemplate = useTourStore((state) => state.deleteHandoverTemplate);
 
   const show = shows.find((s) => s.id === id);
   const personnel = allPersonnel.filter((p) => p.showId === id);
@@ -112,6 +115,10 @@ export default function ShowDetailPage() {
   const [personnelRoleFilter, setPersonnelRoleFilter] = useState('');
   const [equipmentSearch, setEquipmentSearch] = useState('');
   const [equipmentCategoryFilter, setEquipmentCategoryFilter] = useState<EquipmentCategory | 'all'>('all');
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
+  const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateDesc, setNewTemplateDesc] = useState('');
 
   useEffect(() => {
     if (show) {
@@ -326,6 +333,33 @@ export default function ShowDetailPage() {
     const personnelIds = [...filteredCastMembers, ...filteredCrewMembers].map((p) => p.id);
     const equipmentIds = filteredEquipment.map((e) => e.id);
     navigate(`/settlement?showId=${id}&personnelIds=${personnelIds.join(',')}&equipmentIds=${equipmentIds.join(',')}`);
+  };
+
+  const handleSaveTemplate = () => {
+    if (!newTemplateName.trim()) return;
+    const personnelIds = [...filteredCastMembers, ...filteredCrewMembers].map((p) => p.id);
+    const equipmentIds = filteredEquipment.map((e) => e.id);
+    addHandoverTemplate({
+      name: newTemplateName.trim(),
+      description: newTemplateDesc.trim(),
+      personnelIds,
+      equipmentIds,
+      personnelSearch,
+      personnelRoleFilter,
+      equipmentSearch,
+      equipmentCategoryFilter,
+    });
+    setShowSaveTemplateModal(false);
+    setNewTemplateName('');
+    setNewTemplateDesc('');
+  };
+
+  const applyTemplate = (template: HandoverTemplate) => {
+    setPersonnelSearch(template.personnelSearch);
+    setPersonnelRoleFilter(template.personnelRoleFilter);
+    setEquipmentSearch(template.equipmentSearch);
+    setEquipmentCategoryFilter(template.equipmentCategoryFilter);
+    setShowTemplateModal(false);
   };
 
   const equipmentByCategory = useMemo(() => {
@@ -719,6 +753,20 @@ export default function ShowDetailPage() {
                 <option key={role} value={role}>{role}</option>
               ))}
             </select>
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="btn-ghost text-sm flex items-center gap-1"
+            >
+              <FileText className="w-4 h-4" />
+              套用模板
+            </button>
+            <button
+              onClick={() => setShowSaveTemplateModal(true)}
+              className="btn-secondary text-sm flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              保存为模板
+            </button>
             <div className="flex-1"></div>
             <button
               onClick={handleExportToSummary}
@@ -808,6 +856,20 @@ export default function ShowDetailPage() {
               <option value="video">视频设备</option>
               <option value="other">其他设备</option>
             </select>
+            <button
+              onClick={() => setShowTemplateModal(true)}
+              className="btn-ghost text-sm flex items-center gap-1"
+            >
+              <FileText className="w-4 h-4" />
+              套用模板
+            </button>
+            <button
+              onClick={() => setShowSaveTemplateModal(true)}
+              className="btn-secondary text-sm flex items-center gap-1"
+            >
+              <Plus className="w-4 h-4" />
+              保存为模板
+            </button>
             <div className="flex-1"></div>
             <button
               onClick={handleExportToSummary}
@@ -1518,6 +1580,125 @@ export default function ShowDetailPage() {
                 }}
               />
             </div>
+          )}
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showSaveTemplateModal}
+        onClose={() => setShowSaveTemplateModal(false)}
+        title="保存为交接模板"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowSaveTemplateModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleSaveTemplate} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              模板名称 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={newTemplateName}
+              onChange={(e) => setNewTemplateName(e.target.value)}
+              placeholder="如：核心演员+灯光设备"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              备注说明
+            </label>
+            <textarea
+              value={newTemplateDesc}
+              onChange={(e) => setNewTemplateDesc(e.target.value)}
+              rows={3}
+              placeholder="描述这个模板的用途..."
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400 resize-none"
+            />
+          </div>
+          <div className="p-3 bg-cream-50 rounded-lg text-sm text-charcoal-500">
+            <p>当前筛选将被保存：</p>
+            <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
+              <div>
+                人员: {[...filteredCastMembers, ...filteredCrewMembers].length} 人
+                {personnelSearch && <span className="text-wine-600"> · 搜索 "{personnelSearch}"</span>}
+                {personnelRoleFilter && <span className="text-wine-600"> · 角色 "{personnelRoleFilter}"</span>}
+              </div>
+              <div>
+                设备: {filteredEquipment.length} 项
+                {equipmentSearch && <span className="text-wine-600"> · 搜索 "{equipmentSearch}"</span>}
+                {equipmentCategoryFilter !== 'all' && <span className="text-wine-600"> · 分类 "{equipmentCategoryFilter}"</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showTemplateModal}
+        onClose={() => setShowTemplateModal(false)}
+        title="套用交接模板"
+        size="lg"
+      >
+        <div className="space-y-3">
+          {handoverTemplates.length === 0 ? (
+            <div className="text-center py-8">
+              <FileText className="w-12 h-12 text-charcoal-200 mx-auto mb-3" />
+              <p className="text-charcoal-400">暂无模板，点击「保存为模板」创建</p>
+            </div>
+          ) : (
+            handoverTemplates.map((template) => (
+              <div
+                key={template.id}
+                className="flex items-center justify-between p-4 border border-gold-200 rounded-lg hover:bg-cream-50 transition-colors group"
+              >
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-medium text-charcoal-700">{template.name}</h4>
+                    <span className="text-xs text-charcoal-400">{template.createdAt}</span>
+                  </div>
+                  {template.description && (
+                    <p className="text-sm text-charcoal-500 mt-1">{template.description}</p>
+                  )}
+                  <div className="flex items-center gap-4 mt-2 text-xs text-charcoal-400">
+                    <span>人员 {template.personnelIds.length} 人</span>
+                    <span>设备 {template.equipmentIds.length} 项</span>
+                    {template.personnelSearch && <span>搜索: {template.personnelSearch}</span>}
+                    {template.equipmentCategoryFilter !== 'all' && <span>分类: {template.equipmentCategoryFilter}</span>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 ml-4">
+                  <button
+                    onClick={() => applyTemplate(template)}
+                    className="btn-primary text-sm"
+                  >
+                    套用
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm('确定要删除这个模板吗？')) {
+                        deleteHandoverTemplate(template.id);
+                      }
+                    }}
+                    className="p-1.5 text-charcoal-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                    title="删除模板"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
           )}
         </div>
       </Modal>

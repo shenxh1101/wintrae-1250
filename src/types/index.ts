@@ -118,3 +118,16 @@ export interface ReminderItem {
   dueDate: string;
   isUrgent: boolean;
 }
+
+export interface HandoverTemplate {
+  id: string;
+  name: string;
+  description?: string;
+  personnelIds: string[];
+  equipmentIds: string[];
+  personnelSearch: string;
+  personnelRoleFilter: string;
+  equipmentSearch: string;
+  equipmentCategoryFilter: EquipmentCategory | 'all';
+  createdAt: string;
+}

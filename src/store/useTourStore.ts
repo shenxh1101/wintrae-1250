@@ -10,6 +10,7 @@ import type {
   VenuePhoto,
   Settlement,
   ReminderItem,
+  HandoverTemplate,
 } from '../types';
 import {
   mockShows,
@@ -33,6 +34,7 @@ interface TourState {
   venuePhotos: VenuePhoto[];
   settlements: Settlement[];
   reminders: ReminderItem[];
+  handoverTemplates: HandoverTemplate[];
   currentShowId: string | null;
 
   setCurrentShowId: (id: string | null) => void;
@@ -64,6 +66,10 @@ interface TourState {
 
   updateSettlement: (showId: string, updates: Partial<Settlement>) => void;
   archiveShow: (showId: string) => void;
+
+  addHandoverTemplate: (template: Omit<HandoverTemplate, 'id' | 'createdAt'>) => void;
+  updateHandoverTemplate: (id: string, updates: Partial<HandoverTemplate>) => void;
+  deleteHandoverTemplate: (id: string) => void;
 }
 
 const generateId = (prefix: string) =>
@@ -81,6 +87,7 @@ export const useTourStore = create<TourState>()(
       venuePhotos: mockVenuePhotos,
       settlements: mockSettlements,
       reminders: mockReminders,
+      handoverTemplates: [],
       currentShowId: null,
 
       setCurrentShowId: (id) => set({ currentShowId: id }),
@@ -352,6 +359,30 @@ export const useTourStore = create<TourState>()(
           settlements: state.settlements.map((s) =>
             s.showId === showId ? { ...s, isArchived: true } : s
           ),
+        })),
+
+      addHandoverTemplate: (template) =>
+        set((state) => ({
+          handoverTemplates: [
+            ...state.handoverTemplates,
+            {
+              ...template,
+              id: generateId('tpl'),
+              createdAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+            },
+          ],
+        })),
+
+      updateHandoverTemplate: (id, updates) =>
+        set((state) => ({
+          handoverTemplates: state.handoverTemplates.map((t) =>
+            t.id === id ? { ...t, ...updates } : t
+          ),
+        })),
+
+      deleteHandoverTemplate: (id) =>
+        set((state) => ({
+          handoverTemplates: state.handoverTemplates.filter((t) => t.id !== id),
         })),
     }),
     {

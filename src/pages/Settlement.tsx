@@ -15,6 +15,12 @@ import {
   ChevronRight,
   Edit3,
   Lock,
+  ChevronDown,
+  AlignLeft,
+  Briefcase,
+  Users,
+  Settings,
+  Package,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -66,6 +72,8 @@ export default function SettlementPage() {
   );
   const [filteredPersonnelIds, setFilteredPersonnelIds] = useState<string[] | null>(null);
   const [filteredEquipmentIds, setFilteredEquipmentIds] = useState<string[] | null>(null);
+  const [summaryViewMode, setSummaryViewMode] = useState<'text' | 'package'>('text');
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['basic', 'contact']));
 
   useEffect(() => {
     if (urlShowId) {
@@ -107,9 +115,17 @@ export default function SettlementPage() {
         shareRatio: s?.shareRatio || 50,
         expenses: s?.expenses || 0,
       });
-      setIsEditing(false);
+      if (s?.isArchived) {
+        setIsEditing(false);
+      }
     }
   }, [selectedShow, settlements]);
+
+  useEffect(() => {
+    if (isArchived && isEditing) {
+      setIsEditing(false);
+    }
+  }, [isArchived, isEditing]);
 
   const handleSelectShow = (showId: string) => {
     if (showId !== selectedShow) {
@@ -145,6 +161,8 @@ export default function SettlementPage() {
     setSummarySections(SUMMARY_SECTIONS.map((s) => s.key));
     setFilteredPersonnelIds(null);
     setFilteredEquipmentIds(null);
+    setSummaryViewMode('text');
+    setExpandedSections(new Set(['basic', 'contact']));
     setShowSummaryModal(true);
   };
 
@@ -166,6 +184,18 @@ export default function SettlementPage() {
 
   const deselectAllSections = () => {
     setSummarySections([]);
+  };
+
+  const toggleSectionExpand = (key: string) => {
+    setExpandedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
   };
 
   const getStatusText = (status: string) => {
@@ -741,55 +771,387 @@ ${showIssues.map((i) => `  [${i.status === 'resolved' ? '✓' : ' '}] ${i.title}
       >
         {summaryShowId && (
           <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-sm font-medium text-charcoal-700">导出范围</p>
-                <div className="flex gap-2">
-                  <button
-                    onClick={selectAllSections}
-                    className="text-xs text-wine-600 hover:text-wine-700"
-                  >
-                    全选
-                  </button>
-                  <span className="text-charcoal-300">|</span>
-                  <button
-                    onClick={deselectAllSections}
-                    className="text-xs text-charcoal-400 hover:text-charcoal-600"
-                  >
-                    全不选
-                  </button>
-                </div>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-cream-100 rounded-lg p-1">
+                <button
+                  onClick={() => setSummaryViewMode('text')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    summaryViewMode === 'text'
+                      ? 'bg-white text-wine-700 shadow-sm font-medium'
+                      : 'text-charcoal-500 hover:text-charcoal-700'
+                  }`}
+                >
+                  <AlignLeft className="w-4 h-4" />
+                  文本摘要
+                </button>
+                <button
+                  onClick={() => setSummaryViewMode('package')}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+                    summaryViewMode === 'package'
+                      ? 'bg-white text-wine-700 shadow-sm font-medium'
+                      : 'text-charcoal-500 hover:text-charcoal-700'
+                  }`}
+                >
+                  <Briefcase className="w-4 h-4" />
+                  交接包
+                </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {SUMMARY_SECTIONS.map((section) => (
-                  <label
-                    key={section.key}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs cursor-pointer transition-colors border ${
-                      summarySections.includes(section.key)
-                        ? 'bg-wine-100 border-wine-300 text-wine-700'
-                        : 'bg-cream-50 border-gold-200 text-charcoal-400'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={summarySections.includes(section.key)}
-                      onChange={() => toggleSection(section.key)}
-                      className="sr-only"
-                    />
-                    {summarySections.includes(section.key) ? (
-                      <CheckCircle className="w-3 h-3" />
-                    ) : (
-                      <span className="w-3 h-3 rounded-full border border-current"></span>
-                    )}
-                    {section.label}
-                  </label>
-                ))}
+              <div>
+                <div className="flex items-center justify-end mb-2">
+                  <p className="text-sm font-medium text-charcoal-700 mr-3">导出范围</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={selectAllSections}
+                      className="text-xs text-wine-600 hover:text-wine-700"
+                    >
+                      全选
+                    </button>
+                    <span className="text-charcoal-300">|</span>
+                    <button
+                      onClick={deselectAllSections}
+                      className="text-xs text-charcoal-400 hover:text-charcoal-600"
+                    >
+                      全不选
+                    </button>
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 justify-end">
+                  {SUMMARY_SECTIONS.map((section) => (
+                    <label
+                      key={section.key}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs cursor-pointer transition-colors border ${
+                        summarySections.includes(section.key)
+                          ? 'bg-wine-100 border-wine-300 text-wine-700'
+                          : 'bg-cream-50 border-gold-200 text-charcoal-400'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={summarySections.includes(section.key)}
+                        onChange={() => toggleSection(section.key)}
+                        className="sr-only"
+                      />
+                      {summarySections.includes(section.key) ? (
+                        <CheckCircle className="w-3 h-3" />
+                      ) : (
+                        <span className="w-3 h-3 rounded-full border border-current"></span>
+                      )}
+                      {section.label}
+                    </label>
+                  ))}
+                </div>
               </div>
             </div>
 
-            <div className="bg-cream-50 rounded-lg p-6 border border-gold-200/50 font-mono text-sm whitespace-pre-wrap text-charcoal-700 max-h-[50vh] overflow-y-auto">
-              {generateSummaryText(summaryShowId, summarySections)}
-            </div>
+            {summaryViewMode === 'text' ? (
+              <div className="bg-cream-50 rounded-lg p-6 border border-gold-200/50 font-mono text-sm whitespace-pre-wrap text-charcoal-700 max-h-[55vh] overflow-y-auto">
+                {generateSummaryText(summaryShowId, summarySections)}
+              </div>
+            ) : (
+              <div className="space-y-3 max-h-[55vh] overflow-y-auto pr-2">
+                {(() => {
+                  const show = shows.find((s) => s.id === summaryShowId);
+                  const settlement = settlements.find((s) => s.showId === summaryShowId);
+                  const showPersonnel = filteredPersonnelIds
+                    ? personnel.filter((p) => p.showId === summaryShowId && filteredPersonnelIds.includes(p.id))
+                    : personnel.filter((p) => p.showId === summaryShowId);
+                  const showEquipment = filteredEquipmentIds
+                    ? equipment.filter((e) => e.showId === summaryShowId && filteredEquipmentIds.includes(e.id))
+                    : equipment.filter((e) => e.showId === summaryShowId);
+                  const showMaterials = materials.filter((m) => m.showId === summaryShowId);
+                  const showIssues = issues.filter((i) => i.showId === summaryShowId);
+
+                  if (!show) return null;
+
+                  const castList = showPersonnel.filter((p) => p.type === 'cast');
+                  const crewList = showPersonnel.filter((p) => p.type === 'crew');
+                  const vipSold = settlement?.ticketSoldVip || 0;
+                  const stdSold = settlement?.ticketSoldStandard || 0;
+                  const totalSold = vipSold + stdSold;
+                  const actualBoxOffice = settlement?.actualBoxOffice || 0;
+                  const guaranteeFee = settlement?.guaranteeFee || 0;
+                  const shareRatio = settlement?.shareRatio || 0;
+                  const expenses = settlement?.expenses || 0;
+                  const shareAmount = Math.round((actualBoxOffice * shareRatio) / 100);
+
+                  const packageSections = [
+                    {
+                      key: 'basic',
+                      icon: <Calendar className="w-4 h-4" />,
+                      title: '基础信息',
+                      section: 'basic' as SummarySection,
+                      content: (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-charcoal-400">演出日期</span>
+                            <p className="text-charcoal-700 font-medium">{show.date}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">演出时间</span>
+                            <p className="text-charcoal-700 font-medium">{show.startTime} - {show.endTime}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">城市</span>
+                            <p className="text-charcoal-700 font-medium">{show.city}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">场馆</span>
+                            <p className="text-charcoal-700 font-medium">{show.venue}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">进场时间</span>
+                            <p className="text-charcoal-700 font-medium">{show.loadInTime}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">撤场时间</span>
+                            <p className="text-charcoal-700 font-medium">{show.loadOutTime}</p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'contact',
+                      icon: <Users className="w-4 h-4" />,
+                      title: '联系人',
+                      section: 'basic' as SummarySection,
+                      content: (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-charcoal-400">场馆对接人</span>
+                            <p className="text-charcoal-700 font-medium">{show.venueContact || '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">联系电话</span>
+                            <p className="text-charcoal-700 font-medium">{show.venuePhone || '-'}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">场馆地址</span>
+                            <p className="text-charcoal-700 font-medium">{show.venueAddress || '-'}</p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'ticket',
+                      icon: <Ticket className="w-4 h-4" />,
+                      title: '票务结算',
+                      section: 'ticket' as SummarySection,
+                      content: (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-charcoal-400">总票数</span>
+                            <p className="text-charcoal-700 font-medium">{show.ticketTotal} 张</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">总售票数</span>
+                            <p className="text-charcoal-700 font-medium">{totalSold} 张 ({show.ticketTotal > 0 ? Math.round((totalSold / show.ticketTotal) * 100) : 0}%)</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">VIP票价</span>
+                            <p className="text-charcoal-700 font-medium">¥{show.ticketPriceVip} (售出 {vipSold} 张)</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">普通票价</span>
+                            <p className="text-charcoal-700 font-medium">¥{show.ticketPriceStandard} (售出 {stdSold} 张)</p>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-charcoal-400">实际票房</span>
+                            <p className="text-lg font-serif-sc font-bold text-wine-700">¥{actualBoxOffice.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'personnel',
+                      icon: <Users className="w-4 h-4" />,
+                      title: `人员名单 (${showPersonnel.length})`,
+                      section: 'personnel' as SummarySection,
+                      content: (
+                        <div className="space-y-4">
+                          {castList.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gold-600 mb-2">演员 ({castList.length})</p>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                {castList.map((p) => (
+                                  <div key={p.id} className="flex items-center gap-2 p-2 bg-cream-50 rounded">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-wine-400 to-gold-400 flex items-center justify-center text-white text-xs font-medium">
+                                      {p.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <p className="text-charcoal-700 font-medium">{p.name}</p>
+                                      <p className="text-xs text-charcoal-400">{p.role}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {crewList.length > 0 && (
+                            <div>
+                              <p className="text-xs font-medium text-gold-600 mb-2">工作人员 ({crewList.length})</p>
+                              <div className="grid grid-cols-2 gap-2 text-sm">
+                                {crewList.map((p) => (
+                                  <div key={p.id} className="flex items-center gap-2 p-2 bg-cream-50 rounded">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-400 to-charcoal-400 flex items-center justify-center text-white text-xs font-medium">
+                                      {p.name.charAt(0)}
+                                    </div>
+                                    <div>
+                                      <p className="text-charcoal-700 font-medium">{p.name}</p>
+                                      <p className="text-xs text-charcoal-400">{p.role}</p>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'equipment',
+                      icon: <Settings className="w-4 h-4" />,
+                      title: `设备清单 (${showEquipment.length})`,
+                      section: 'equipment' as SummarySection,
+                      content: (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="text-left text-xs text-charcoal-400 border-b border-gold-100">
+                                <th className="pb-2 font-medium">设备名称</th>
+                                <th className="pb-2 font-medium text-center">数量</th>
+                                <th className="pb-2 font-medium">分类</th>
+                                <th className="pb-2 font-medium">提供方</th>
+                                <th className="pb-2 font-medium">备注</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {showEquipment.map((e) => (
+                                <tr key={e.id} className="border-b border-gold-50 last:border-0">
+                                  <td className="py-2 text-charcoal-700">{e.name}</td>
+                                  <td className="py-2 text-charcoal-700 text-center font-medium">{e.quantity}</td>
+                                  <td className="py-2 text-charcoal-500 text-sm">
+                                    {e.category === 'lighting' ? '灯光' : e.category === 'sound' ? '音响' : e.category === 'stage' ? '舞台' : e.category === 'video' ? '视频' : '其他'}
+                                  </td>
+                                  <td className="py-2">
+                                    <span className={`text-xs px-1.5 py-0.5 rounded ${e.providedBy === 'tour' ? 'bg-wine-100 text-wine-700' : e.providedBy === 'venue' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                                      {e.providedBy === 'tour' ? '自带' : e.providedBy === 'venue' ? '场馆' : '租赁'}
+                                    </span>
+                                  </td>
+                                  <td className="py-2 text-charcoal-500 text-sm">{e.note || '-'}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'material',
+                      icon: <Package className="w-4 h-4" />,
+                      title: `物料状态 (${showMaterials.length})`,
+                      section: 'material' as SummarySection,
+                      content: (
+                        <div className="grid grid-cols-2 gap-2 text-sm">
+                          {showMaterials.map((m) => (
+                            <div key={m.id} className="flex items-center justify-between p-2 bg-cream-50 rounded">
+                              <div>
+                                <p className="text-charcoal-700 font-medium">{m.name}</p>
+                                {m.quantity > 0 && <p className="text-xs text-charcoal-400">数量: {m.quantity}</p>}
+                              </div>
+                              <span className={`text-xs px-2 py-1 rounded-full ${m.status === 'delivered' ? 'bg-emerald-100 text-emerald-700' : m.status === 'shipped' ? 'bg-blue-100 text-blue-700' : m.status === 'in_production' ? 'bg-amber-100 text-amber-700' : 'bg-charcoal-100 text-charcoal-700'}`}>
+                                {getStatusText(m.status)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'issue',
+                      icon: <AlertCircle className="w-4 h-4" />,
+                      title: `待办问题 (${showIssues.length})`,
+                      section: 'issue' as SummarySection,
+                      content: (
+                        <div className="space-y-2 text-sm">
+                          {showIssues.map((i) => (
+                            <div key={i.id} className="flex items-start gap-3 p-2 bg-cream-50 rounded">
+                              <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 ${i.status === 'resolved' ? 'bg-emerald-100' : 'bg-amber-100'}`}>
+                                {i.status === 'resolved' ? (
+                                  <CheckCircle className="w-3 h-3 text-emerald-600" />
+                                ) : (
+                                  <AlertCircle className="w-3 h-3 text-amber-600" />
+                                )}
+                              </div>
+                              <div className="flex-1">
+                                <p className={`font-medium ${i.status === 'resolved' ? 'text-charcoal-400 line-through' : 'text-charcoal-700'}`}>
+                                  {i.title}
+                                </p>
+                                <div className="flex items-center gap-3 mt-1 text-xs text-charcoal-400">
+                                  <span>负责人: {i.assignee}</span>
+                                  {i.dueDate && <span>截止: {i.dueDate}</span>}
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ),
+                    },
+                    {
+                      key: 'settlement',
+                      icon: <DollarSign className="w-4 h-4" />,
+                      title: '结算口径',
+                      section: 'settlement' as SummarySection,
+                      content: (
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-charcoal-400">保底费用</span>
+                            <p className="text-charcoal-700 font-medium">¥{guaranteeFee.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">分成比例</span>
+                            <p className="text-charcoal-700 font-medium">{shareRatio}%</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">演出成本</span>
+                            <p className="text-charcoal-700 font-medium">¥{expenses.toLocaleString()}</p>
+                          </div>
+                          <div>
+                            <span className="text-charcoal-400">实际分成</span>
+                            <p className="text-charcoal-700 font-medium">¥{shareAmount.toLocaleString()}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-charcoal-400">结算金额 (取保底与分成较高者)</span>
+                            <p className="text-lg font-serif-sc font-bold text-wine-700">¥{Math.max(guaranteeFee, shareAmount).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ),
+                    },
+                  ];
+
+                  return packageSections
+                    .filter((s) => summarySections.includes(s.section))
+                    .map((ps) => (
+                      <div key={ps.key} className="border border-gold-200 rounded-lg overflow-hidden">
+                        <button
+                          onClick={() => toggleSectionExpand(ps.key)}
+                          className="w-full flex items-center justify-between p-3 bg-cream-50 hover:bg-cream-100 transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded bg-wine-100 text-wine-600 flex items-center justify-center">
+                              {ps.icon}
+                            </span>
+                            <span className="font-medium text-charcoal-700">{ps.title}</span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-charcoal-400 transition-transform ${expandedSections.has(ps.key) ? 'rotate-180' : ''}`} />
+                        </button>
+                        {expandedSections.has(ps.key) && (
+                          <div className="p-4 border-t border-gold-100">{ps.content}</div>
+                        )}
+                      </div>
+                    ));
+                })()}
+              </div>
+            )}
           </div>
         )}
       </Modal>
