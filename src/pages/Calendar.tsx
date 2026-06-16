@@ -10,6 +10,8 @@ import {
   AlertCircle,
   Plus,
   Copy,
+  Route,
+  Calendar as CalendarIcon,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -25,6 +27,7 @@ export default function CalendarPage() {
 
   const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1));
   const [showAddModal, setShowAddModal] = useState(false);
+  const [viewMode, setViewMode] = useState<'calendar' | 'route'>('calendar');
   const [newShow, setNewShow] = useState({
     city: '',
     venue: '',
@@ -86,6 +89,10 @@ export default function CalendarPage() {
     };
   }, [shows]);
 
+  const sortedShows = useMemo(() => {
+    return [...shows].sort((a, b) => a.date.localeCompare(b.date));
+  }, [shows]);
+
   const handleDuplicate = (showId: string) => {
     const newId = duplicateShow(showId);
     if (newId) {
@@ -137,13 +144,57 @@ export default function CalendarPage() {
     '七月', '八月', '九月', '十月', '十一月', '十二月',
   ];
 
+  const getDaysBetween = (date1: string, date2: string) => {
+    const d1 = new Date(date1);
+    const d2 = new Date(date2);
+    const diff = Math.abs(d2.getTime() - d1.getTime());
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+  };
+
+  const getStatusColor = (status: string) => {
+    const map: Record<string, string> = {
+      confirmed: 'bg-emerald-500',
+      pending: 'bg-amber-500',
+      completed: 'bg-charcoal-400',
+      cancelled: 'bg-red-400',
+      archived: 'bg-charcoal-300',
+    };
+    return map[status] || 'bg-charcoal-300';
+  };
+
   return (
     <div className="p-6 animate-fade-in">
-      <div className="mb-6">
-        <h1 className="font-serif-sc text-2xl font-bold text-wine-800 mb-2">
-          巡演日历总览
-        </h1>
-        <p className="text-charcoal-500">查看全巡演排期，快速跳转到指定场次</p>
+      <div className="mb-6 flex items-end justify-between">
+        <div>
+          <h1 className="font-serif-sc text-2xl font-bold text-wine-800 mb-2">
+            巡演日历总览
+          </h1>
+          <p className="text-charcoal-500">查看全巡演排期，快速跳转到指定场次</p>
+        </div>
+        <div className="flex items-center gap-1 bg-cream-100 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('calendar')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+              viewMode === 'calendar'
+                ? 'bg-white text-wine-700 shadow-sm font-medium'
+                : 'text-charcoal-500 hover:text-charcoal-700'
+            }`}
+          >
+            <CalendarIcon className="w-4 h-4" />
+            日历
+          </button>
+          <button
+            onClick={() => setViewMode('route')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors ${
+              viewMode === 'route'
+                ? 'bg-white text-wine-700 shadow-sm font-medium'
+                : 'text-charcoal-500 hover:text-charcoal-700'
+            }`}
+          >
+            <Route className="w-4 h-4" />
+            线路
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-4 gap-4 mb-6">
@@ -187,92 +238,197 @@ export default function CalendarPage() {
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        <div className="col-span-2">
-          <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CalendarDays className="w-5 h-5 text-gold-500" />
-                  <h2 className="font-serif-sc text-lg font-semibold text-wine-700">
-                    {year} 年 {monthNames[month]}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={prevMonth}
-                    className="p-1.5 rounded-md hover:bg-wine-50 text-charcoal-500 hover:text-wine-600 transition-colors"
-                  >
-                    <ChevronLeft className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={nextMonth}
-                    className="p-1.5 rounded-md hover:bg-wine-50 text-charcoal-500 hover:text-wine-600 transition-colors"
-                  >
-                    <ChevronRight className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardBody>
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {weekDays.map((day) => (
-                  <div
-                    key={day}
-                    className="text-center text-sm font-medium text-charcoal-400 py-2"
-                  >
-                    {day}
+        {viewMode === 'calendar' ? (
+          <div className="col-span-2">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <CalendarDays className="w-5 h-5 text-gold-500" />
+                    <h2 className="font-serif-sc text-lg font-semibold text-wine-700">
+                      {year} 年 {monthNames[month]}
+                    </h2>
                   </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((day, index) => {
-                  if (day === null) {
-                    return <div key={`empty-${index}`} className="h-20"></div>;
-                  }
-
-                  const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const dayShows = showsByDate[dateStr] || [];
-                  const isToday = day === 16 && month === 5 && year === 2026;
-
-                  return (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={prevMonth}
+                      className="p-1.5 rounded-md hover:bg-wine-50 text-charcoal-500 hover:text-wine-600 transition-colors"
+                    >
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={nextMonth}
+                      className="p-1.5 rounded-md hover:bg-wine-50 text-charcoal-500 hover:text-wine-600 transition-colors"
+                    >
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardBody>
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {weekDays.map((day) => (
                     <div
                       key={day}
-                      className={`h-20 p-1.5 rounded-md border transition-colors ${
-                        isToday
-                          ? 'bg-gold-50 border-gold-300'
-                          : 'bg-cream-50/50 border-transparent hover:border-gold-200'
-                      }`}
+                      className="text-center text-sm font-medium text-charcoal-400 py-2"
                     >
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((day, index) => {
+                    if (day === null) {
+                      return <div key={`empty-${index}`} className="h-20"></div>;
+                    }
+
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const dayShows = showsByDate[dateStr] || [];
+                    const isToday = day === 16 && month === 5 && year === 2026;
+
+                    return (
                       <div
-                        className={`text-sm font-medium mb-1 ${
-                          isToday ? 'text-gold-600' : 'text-charcoal-600'
+                        key={day}
+                        className={`h-20 p-1.5 rounded-md border transition-colors ${
+                          isToday
+                            ? 'bg-gold-50 border-gold-300'
+                            : 'bg-cream-50/50 border-transparent hover:border-gold-200'
                         }`}
                       >
-                        {day}
+                        <div
+                          className={`text-sm font-medium mb-1 ${
+                            isToday ? 'text-gold-600' : 'text-charcoal-600'
+                          }`}
+                        >
+                          {day}
+                        </div>
+                        <div className="space-y-1">
+                          {dayShows.slice(0, 2).map((show) => (
+                            <div
+                              key={show.id}
+                              onClick={() => navigate(`/shows/${show.id}`)}
+                              className="text-xs truncate px-1.5 py-0.5 rounded bg-wine-100 text-wine-700 cursor-pointer hover:bg-wine-200 transition-colors"
+                            >
+                              <span className="font-medium">{show.city}</span>
+                            </div>
+                          ))}
+                          {dayShows.length > 2 && (
+                            <div className="text-xs text-charcoal-400 px-1">
+                              +{dayShows.length - 2} 场
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="space-y-1">
-                        {dayShows.slice(0, 2).map((show) => (
+                    );
+                  })}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+        ) : (
+          <div className="col-span-2">
+            <Card>
+              <CardHeader>
+                <SectionTitle
+                  icon={<Route className="w-5 h-5 text-gold-500" />}
+                  title="巡演线路"
+                />
+              </CardHeader>
+              <CardBody>
+                {sortedShows.length === 0 ? (
+                  <p className="text-sm text-charcoal-400 text-center py-8">暂无排期</p>
+                ) : (
+                  <div className="relative">
+                    {sortedShows.map((show, index) => {
+                      const gapDays =
+                        index < sortedShows.length - 1
+                          ? getDaysBetween(show.date, sortedShows[index + 1].date)
+                          : null;
+
+                      return (
+                        <div key={show.id}>
                           <div
-                            key={show.id}
                             onClick={() => navigate(`/shows/${show.id}`)}
-                            className="text-xs truncate px-1.5 py-0.5 rounded bg-wine-100 text-wine-700 cursor-pointer hover:bg-wine-200 transition-colors"
+                            className="flex items-center gap-4 p-4 rounded-xl hover:bg-cream-50 cursor-pointer transition-colors group border border-transparent hover:border-gold-200"
                           >
-                            <span className="font-medium">{show.city}</span>
+                            <div className="relative flex flex-col items-center">
+                              <div
+                                className={`w-10 h-10 rounded-full ${getStatusColor(show.status)} flex items-center justify-center text-white font-bold text-sm shadow-sm`}
+                              >
+                                {index + 1}
+                              </div>
+                              {index < sortedShows.length - 1 && (
+                                <div className="w-0.5 h-8 bg-gold-300 mt-2"></div>
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-serif-sc text-lg font-semibold text-wine-800">
+                                  {show.city}
+                                </h3>
+                                <ShowStatusBadge status={show.status} />
+                              </div>
+                              <div className="flex items-center gap-3 mt-1 text-sm text-charcoal-500">
+                                <span className="flex items-center gap-1">
+                                  <CalendarDays className="w-3.5 h-3.5" />
+                                  {show.date}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {show.startTime}
+                                </span>
+                                <span className="flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  {show.venue}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDuplicate(show.id);
+                                }}
+                                className="opacity-0 group-hover:opacity-100 p-1.5 text-charcoal-400 hover:text-wine-600 transition-all"
+                                title="复制配置"
+                              >
+                                <Copy className="w-4 h-4" />
+                              </button>
+                              <ChevronRight className="w-4 h-4 text-charcoal-300" />
+                            </div>
                           </div>
-                        ))}
-                        {dayShows.length > 2 && (
-                          <div className="text-xs text-charcoal-400 px-1">
-                            +{dayShows.length - 2} 场
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardBody>
-          </Card>
-        </div>
+
+                          {gapDays !== null && (
+                            <div className="flex items-center gap-3 pl-4 pb-2">
+                              <div className="w-10 flex justify-center">
+                                <div className="w-0.5 h-4 bg-gold-300"></div>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs">
+                                <div className="flex-1 h-px bg-gold-200"></div>
+                                <span className={`px-2 py-0.5 rounded-full font-medium ${
+                                  gapDays <= 2
+                                    ? 'bg-red-50 text-red-600 border border-red-200'
+                                    : gapDays <= 4
+                                    ? 'bg-amber-50 text-amber-600 border border-amber-200'
+                                    : 'bg-emerald-50 text-emerald-600 border border-emerald-200'
+                                }`}>
+                                  {gapDays} 天
+                                </span>
+                                <div className="flex-1 h-px bg-gold-200"></div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+          </div>
+        )}
 
         <div className="space-y-6">
           <Card>

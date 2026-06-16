@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   FileArchive,
   DollarSign,
@@ -20,7 +21,24 @@ import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
 import { ShowStatusBadge } from '../components/StatusBadge';
 import Modal from '../components/Modal';
 
+type SummarySection = 'basic' | 'ticket' | 'personnel' | 'equipment' | 'material' | 'issue' | 'settlement';
+
+const SUMMARY_SECTIONS: { key: SummarySection; label: string }[] = [
+  { key: 'basic', label: '基础信息' },
+  { key: 'ticket', label: '票务结算' },
+  { key: 'personnel', label: '人员名单' },
+  { key: 'equipment', label: '设备清单' },
+  { key: 'material', label: '物料状态' },
+  { key: 'issue', label: '待办问题' },
+  { key: 'settlement', label: '结算口径' },
+];
+
 export default function SettlementPage() {
+  const [searchParams] = useSearchParams();
+  const urlShowId = searchParams.get('showId');
+  const urlPersonnelIds = searchParams.get('personnelIds');
+  const urlEquipmentIds = searchParams.get('equipmentIds');
+
   const shows = useTourStore((state) => state.shows);
   const settlements = useTourStore((state) => state.settlements);
   const updateSettlement = useTourStore((state) => state.updateSettlement);
@@ -43,6 +61,27 @@ export default function SettlementPage() {
     shareRatio: 50,
     expenses: 0,
   });
+  const [summarySections, setSummarySections] = useState<SummarySection[]>(
+    SUMMARY_SECTIONS.map((s) => s.key)
+  );
+  const [filteredPersonnelIds, setFilteredPersonnelIds] = useState<string[] | null>(null);
+  const [filteredEquipmentIds, setFilteredEquipmentIds] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    if (urlShowId) {
+      setSelectedShow(urlShowId);
+      if (urlPersonnelIds || urlEquipmentIds) {
+        setFilteredPersonnelIds(urlPersonnelIds ? urlPersonnelIds.split(',') : null);
+        setFilteredEquipmentIds(urlEquipmentIds ? urlEquipmentIds.split(',') : null);
+        setSummaryShowId(urlShowId);
+        const sections: SummarySection[] = ['basic'];
+        if (urlPersonnelIds) sections.push('personnel');
+        if (urlEquipmentIds) sections.push('equipment');
+        setSummarySections(sections);
+        setShowSummaryModal(true);
+      }
+    }
+  }, [urlShowId, urlPersonnelIds, urlEquipmentIds]);
 
   const showsWithSettlement = useMemo(() => {
     return shows.map((show) => {
@@ -55,19 +94,29 @@ export default function SettlementPage() {
     ? settlements.find((s) => s.showId === selectedShow)
     : null;
 
+  const isArchived = selectedSettlement?.isArchived ?? false;
+
   useEffect(() => {
-    if (selectedSettlement) {
+    if (selectedShow) {
+      const s = settlements.find((st) => st.showId === selectedShow);
       setSettlementForm({
-        ticketSoldVip: selectedSettlement.ticketSoldVip || 0,
-        ticketSoldStandard: selectedSettlement.ticketSoldStandard || 0,
-        actualBoxOffice: selectedSettlement.actualBoxOffice,
-        guaranteeFee: selectedSettlement.guaranteeFee,
-        shareRatio: selectedSettlement.shareRatio,
-        expenses: selectedSettlement.expenses || 0,
+        ticketSoldVip: s?.ticketSoldVip || 0,
+        ticketSoldStandard: s?.ticketSoldStandard || 0,
+        actualBoxOffice: s?.actualBoxOffice || 0,
+        guaranteeFee: s?.guaranteeFee || 0,
+        shareRatio: s?.shareRatio || 50,
+        expenses: s?.expenses || 0,
       });
       setIsEditing(false);
     }
-  }, [selectedSettlement]);
+  }, [selectedShow, settlements]);
+
+  const handleSelectShow = (showId: string) => {
+    if (showId !== selectedShow) {
+      setSelectedShow(showId);
+      setIsEditing(false);
+    }
+  };
 
   const handleSaveSettlement = () => {
     if (selectedShow) {
@@ -77,7 +126,7 @@ export default function SettlementPage() {
   };
 
   const handleStartEdit = () => {
-    if (!selectedSettlement?.isArchived) {
+    if (!isArchived) {
       setIsEditing(true);
     }
   };
@@ -93,6 +142,9 @@ export default function SettlementPage() {
 
   const handleGenerateSummary = (showId: string) => {
     setSummaryShowId(showId);
+    setSummarySections(SUMMARY_SECTIONS.map((s) => s.key));
+    setFilteredPersonnelIds(null);
+    setFilteredEquipmentIds(null);
     setShowSummaryModal(true);
   };
 
@@ -102,77 +154,18 @@ export default function SettlementPage() {
     }
   };
 
-  const generateSummaryText = (showId: string) => {
-    const show = shows.find((s) => s.id === showId);
-    const settlement = settlements.find((s) => s.showId === showId);
-    const showPersonnel = personnel.filter((p) => p.showId === showId);
-    const showEquipment = equipment.filter((e) => e.showId === showId);
-    const showMaterials = materials.filter((m) => m.showId === showId);
-    const showIssues = issues.filter((i) => i.showId === showId);
+  const toggleSection = (key: SummarySection) => {
+    setSummarySections((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    );
+  };
 
-    if (!show) return '';
+  const selectAllSections = () => {
+    setSummarySections(SUMMARY_SECTIONS.map((s) => s.key));
+  };
 
-    const castList = showPersonnel.filter((p) => p.type === 'cast');
-    const crewList = showPersonnel.filter((p) => p.type === 'crew');
-    const vipSold = settlement?.ticketSoldVip || 0;
-    const stdSold = settlement?.ticketSoldStandard || 0;
-    const totalSold = vipSold + stdSold;
-    const actualBoxOffice = settlement?.actualBoxOffice || 0;
-    const guaranteeFee = settlement?.guaranteeFee || 0;
-    const shareRatio = settlement?.shareRatio || 0;
-    const expenses = settlement?.expenses || 0;
-    const shareAmount = Math.round(actualBoxOffice * shareRatio / 100);
-    const netIncome = actualBoxOffice - expenses - Math.max(guaranteeFee, shareAmount);
-
-    return `【${show.city}站 · ${show.venue}】
-演出日期：${show.date}
-演出时间：${show.startTime} - ${show.endTime}
-进场时间：${show.loadInTime}
-彩排时间：${show.rehearsalTime}
-撤场时间：${show.loadOutTime}
-场馆对接：${show.venueContact || '-'} (${show.venuePhone || '-'})
-
-━━━ 票务信息 ━━━
-总票数：${show.ticketTotal} 张
-VIP票价：¥${show.ticketPriceVip}
-普通票价：¥${show.ticketPriceStandard}
-票房目标：¥${(show.ticketTotal * show.ticketPriceStandard).toLocaleString()}
-
-━━━ 售票统计 ━━━
-VIP票售出：${vipSold} 张
-普通票售出：${stdSold} 张
-总售票数：${totalSold} 张
-售票率：${show.ticketTotal > 0 ? Math.round(totalSold / show.ticketTotal * 100) : 0}%
-实际票房：¥${actualBoxOffice.toLocaleString()}
-
-━━━ 人员名单 ━━━
-【演员】
-${castList.map((p) => `  ${p.name} - ${p.role}`).join('\n')}
-
-【工作人员】
-${crewList.map((p) => `  ${p.name} - ${p.role}`).join('\n')}
-
-━━━ 设备清单 ━━━
-${showEquipment.map((e) => `  ${e.name} × ${e.quantity}`).join('\n')}
-
-━━━ 物料状态 ━━━
-${showMaterials.map((m) => `  ${m.name} - ${getStatusText(m.status)}`).join('\n')}
-
-━━━ 待办事项 ━━━
-${showIssues.map((i) => `  [${i.status === 'resolved' ? '✓' : ' '}] ${i.title} (${i.assignee})`).join('\n')}
-
-━━━ 结算口径 ━━━
-保底费用：¥${guaranteeFee.toLocaleString()}
-分成比例：${shareRatio}%
-演出成本：¥${expenses.toLocaleString()}
-实际分成：¥${shareAmount.toLocaleString()}
-结算金额：¥${Math.max(guaranteeFee, shareAmount).toLocaleString()}
-净收入：¥${netIncome.toLocaleString()}
-
-${settlement?.isArchived ? '【已归档】' : ''}
----
-交接摘要由巡演统筹系统生成
-`;
+  const deselectAllSections = () => {
+    setSummarySections([]);
   };
 
   const getStatusText = (status: string) => {
@@ -185,12 +178,128 @@ ${settlement?.isArchived ? '【已归档】' : ''}
     return map[status] || status;
   };
 
+  const generateSummaryText = useCallback(
+    (showId: string, sections: SummarySection[] = SUMMARY_SECTIONS.map((s) => s.key)) => {
+      const show = shows.find((s) => s.id === showId);
+      const settlement = settlements.find((s) => s.showId === showId);
+      const showPersonnel = filteredPersonnelIds
+        ? personnel.filter((p) => p.showId === showId && filteredPersonnelIds.includes(p.id))
+        : personnel.filter((p) => p.showId === showId);
+      const showEquipment = filteredEquipmentIds
+        ? equipment.filter((e) => e.showId === showId && filteredEquipmentIds.includes(e.id))
+        : equipment.filter((e) => e.showId === showId);
+      const showMaterials = materials.filter((m) => m.showId === showId);
+      const showIssues = issues.filter((i) => i.showId === showId);
+
+      if (!show) return '';
+
+      const castList = showPersonnel.filter((p) => p.type === 'cast');
+      const crewList = showPersonnel.filter((p) => p.type === 'crew');
+      const vipSold = settlement?.ticketSoldVip || 0;
+      const stdSold = settlement?.ticketSoldStandard || 0;
+      const totalSold = vipSold + stdSold;
+      const actualBoxOffice = settlement?.actualBoxOffice || 0;
+      const guaranteeFee = settlement?.guaranteeFee || 0;
+      const shareRatio = settlement?.shareRatio || 0;
+      const expenses = settlement?.expenses || 0;
+      const shareAmount = Math.round((actualBoxOffice * shareRatio) / 100);
+      const netIncome = actualBoxOffice - expenses - Math.max(guaranteeFee, shareAmount);
+
+      const parts: string[] = [];
+
+      parts.push(`【${show.city}站 · ${show.venue}】`);
+
+      if (sections.includes('basic')) {
+        parts.push(`演出日期：${show.date}
+演出时间：${show.startTime} - ${show.endTime}
+进场时间：${show.loadInTime}
+彩排时间：${show.rehearsalTime}
+撤场时间：${show.loadOutTime}
+场馆对接：${show.venueContact || '-'} (${show.venuePhone || '-'})`);
+      }
+
+      if (sections.includes('ticket')) {
+        parts.push(`━━━ 票务信息 ━━━
+总票数：${show.ticketTotal} 张
+VIP票价：¥${show.ticketPriceVip}
+普通票价：¥${show.ticketPriceStandard}
+票房目标：¥${(show.ticketTotal * show.ticketPriceStandard).toLocaleString()}
+
+━━━ 售票统计 ━━━
+VIP票售出：${vipSold} 张
+普通票售出：${stdSold} 张
+总售票数：${totalSold} 张
+售票率：${show.ticketTotal > 0 ? Math.round((totalSold / show.ticketTotal) * 100) : 0}%
+实际票房：¥${actualBoxOffice.toLocaleString()}`);
+      }
+
+      if (sections.includes('personnel')) {
+        parts.push(`━━━ 人员名单 ━━━
+【演员】
+${castList.map((p) => `  ${p.name} - ${p.role}`).join('\n')}
+
+【工作人员】
+${crewList.map((p) => `  ${p.name} - ${p.role}`).join('\n')}`);
+      }
+
+      if (sections.includes('equipment')) {
+        parts.push(`━━━ 设备清单 ━━━
+${showEquipment.map((e) => `  ${e.name} × ${e.quantity}`).join('\n')}`);
+      }
+
+      if (sections.includes('material')) {
+        parts.push(`━━━ 物料状态 ━━━
+${showMaterials.map((m) => `  ${m.name} - ${getStatusText(m.status)}`).join('\n')}`);
+      }
+
+      if (sections.includes('issue')) {
+        parts.push(`━━━ 待办事项 ━━━
+${showIssues.map((i) => `  [${i.status === 'resolved' ? '✓' : ' '}] ${i.title} (${i.assignee})`).join('\n')}`);
+      }
+
+      if (sections.includes('settlement')) {
+        parts.push(`━━━ 结算口径 ━━━
+保底费用：¥${guaranteeFee.toLocaleString()}
+分成比例：${shareRatio}%
+演出成本：¥${expenses.toLocaleString()}
+实际分成：¥${shareAmount.toLocaleString()}
+结算金额：¥${Math.max(guaranteeFee, shareAmount).toLocaleString()}
+净收入：¥${netIncome.toLocaleString()}`);
+      }
+
+      if (settlement?.isArchived) {
+        parts.push('【已归档】');
+      }
+
+      parts.push('---\n交接摘要由巡演统筹系统生成');
+
+      return parts.join('\n\n');
+    },
+    [shows, settlements, personnel, equipment, materials, issues, filteredPersonnelIds, filteredEquipmentIds]
+  );
+
   const handleCopySummary = () => {
     if (summaryShowId) {
-      const text = generateSummaryText(summaryShowId);
+      const text = generateSummaryText(summaryShowId, summarySections);
       navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownloadSummary = () => {
+    if (summaryShowId) {
+      const show = shows.find((s) => s.id === summaryShowId);
+      const text = generateSummaryText(summaryShowId, summarySections);
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${show?.city || '交接'}站_交接摘要_${show?.date || ''}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
     }
   };
 
@@ -216,9 +325,7 @@ ${settlement?.isArchived ? '【已归档】' : ''}
               <Ticket className="w-6 h-6 text-wine-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold text-wine-700">
-                {shows.length}
-              </p>
+              <p className="text-2xl font-bold text-wine-700">{shows.length}</p>
               <p className="text-sm text-charcoal-500">总场次</p>
             </div>
           </CardBody>
@@ -281,7 +388,7 @@ ${settlement?.isArchived ? '【已归档】' : ''}
                     className={`p-4 hover:bg-cream-50 cursor-pointer transition-colors ${
                       selectedShow === show.id ? 'bg-wine-50' : ''
                     }`}
-                    onClick={() => setSelectedShow(show.id)}
+                    onClick={() => handleSelectShow(show.id)}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -338,7 +445,7 @@ ${settlement?.isArchived ? '【已归档】' : ''}
                     icon={<DollarSign className="w-5 h-5 text-gold-500" />}
                     title="结算详情"
                     action={
-                      !selectedShowData.settlement?.isArchived &&
+                      !isArchived &&
                       !isEditing && (
                         <button
                           onClick={handleStartEdit}
@@ -352,7 +459,7 @@ ${settlement?.isArchived ? '【已归档】' : ''}
                   />
                 </CardHeader>
                 <CardBody className="space-y-4">
-                  {selectedShowData.settlement?.isArchived && (
+                  {isArchived && (
                     <div className="flex items-center gap-2 p-2 rounded bg-charcoal-100 text-charcoal-600 text-sm">
                       <Lock className="w-4 h-4" />
                       已归档，无法编辑
@@ -538,13 +645,24 @@ ${settlement?.isArchived ? '【已归档】' : ''}
                   </button>
                   <button
                     onClick={() => handleArchive(selectedShowData.show.id)}
-                    disabled={selectedShowData.settlement?.isArchived}
-                    className="w-full btn-secondary flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isArchived}
+                    className={`w-full flex items-center justify-center gap-2 ${
+                      isArchived
+                        ? 'bg-charcoal-100 text-charcoal-400 cursor-not-allowed rounded-lg px-4 py-2 text-sm font-medium'
+                        : 'btn-secondary'
+                    }`}
                   >
-                    <Archive className="w-4 h-4" />
-                    {selectedShowData.settlement?.isArchived
-                      ? '已归档'
-                      : '归档场次'}
+                    {isArchived ? (
+                      <>
+                        <Lock className="w-4 h-4" />
+                        已归档
+                      </>
+                    ) : (
+                      <>
+                        <Archive className="w-4 h-4" />
+                        归档场次
+                      </>
+                    )}
                   </button>
                 </CardBody>
               </Card>
@@ -566,20 +684,24 @@ ${settlement?.isArchived ? '【已归档】' : ''}
               />
             </CardHeader>
             <CardBody className="space-y-2">
-              <div className="flex items-start gap-2 p-2 rounded bg-amber-50 border border-amber-200/50">
-                <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-amber-800">上海场待结算</p>
-                  <p className="text-xs text-amber-600">演出已结束，请尽快结算</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2 p-2 rounded bg-blue-50 border border-blue-200/50">
-                <CheckCircle className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-sm text-blue-800">北京场待确认</p>
-                  <p className="text-xs text-blue-600">合同签署中</p>
-                </div>
-              </div>
+              {showsWithSettlement
+                .filter(({ settlement, show }) => !settlement?.isArchived && show.status !== 'archived')
+                .slice(0, 3)
+                .map(({ show }) => (
+                  <div
+                    key={show.id}
+                    className="flex items-start gap-2 p-2 rounded bg-amber-50 border border-amber-200/50"
+                  >
+                    <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm text-amber-800">{show.city}场待结算</p>
+                      <p className="text-xs text-amber-600">{show.date} · {show.venue}</p>
+                    </div>
+                  </div>
+                ))}
+              {showsWithSettlement.filter(({ settlement }) => !settlement?.isArchived).length === 0 && (
+                <p className="text-sm text-charcoal-400 text-center py-2">所有场次已归档</p>
+              )}
             </CardBody>
           </Card>
         </div>
@@ -606,7 +728,10 @@ ${settlement?.isArchived ? '【已归档】' : ''}
               >
                 关闭
               </button>
-              <button className="btn-primary flex items-center gap-2">
+              <button
+                onClick={handleDownloadSummary}
+                className="btn-primary flex items-center gap-2"
+              >
                 <Download className="w-4 h-4" />
                 下载
               </button>
@@ -615,8 +740,56 @@ ${settlement?.isArchived ? '【已归档】' : ''}
         }
       >
         {summaryShowId && (
-          <div className="bg-cream-50 rounded-lg p-6 border border-gold-200/50 font-mono text-sm whitespace-pre-wrap text-charcoal-700">
-            {generateSummaryText(summaryShowId)}
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-medium text-charcoal-700">导出范围</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={selectAllSections}
+                    className="text-xs text-wine-600 hover:text-wine-700"
+                  >
+                    全选
+                  </button>
+                  <span className="text-charcoal-300">|</span>
+                  <button
+                    onClick={deselectAllSections}
+                    className="text-xs text-charcoal-400 hover:text-charcoal-600"
+                  >
+                    全不选
+                  </button>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {SUMMARY_SECTIONS.map((section) => (
+                  <label
+                    key={section.key}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs cursor-pointer transition-colors border ${
+                      summarySections.includes(section.key)
+                        ? 'bg-wine-100 border-wine-300 text-wine-700'
+                        : 'bg-cream-50 border-gold-200 text-charcoal-400'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={summarySections.includes(section.key)}
+                      onChange={() => toggleSection(section.key)}
+                      className="sr-only"
+                    />
+                    {summarySections.includes(section.key) ? (
+                      <CheckCircle className="w-3 h-3" />
+                    ) : (
+                      <span className="w-3 h-3 rounded-full border border-current"></span>
+                    )}
+                    {section.label}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-cream-50 rounded-lg p-6 border border-gold-200/50 font-mono text-sm whitespace-pre-wrap text-charcoal-700 max-h-[50vh] overflow-y-auto">
+              {generateSummaryText(summaryShowId, summarySections)}
+            </div>
           </div>
         )}
       </Modal>

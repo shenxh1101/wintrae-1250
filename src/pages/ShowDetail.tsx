@@ -19,6 +19,8 @@ import {
   Trash2,
   Pencil,
   X,
+  Search,
+  FileText,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -28,7 +30,7 @@ import {
   MaterialStatusBadge,
 } from '../components/StatusBadge';
 import Modal from '../components/Modal';
-import type { Personnel, Equipment, Issue, EquipmentCategory } from '../types';
+import type { Personnel, Equipment, Issue, EquipmentCategory, ShowStatus, PersonnelType } from '../types';
 
 export default function ShowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -80,7 +82,7 @@ export default function ShowDetailPage() {
     ticketTotal: 0,
     ticketPriceVip: 0,
     ticketPriceStandard: 0,
-    status: 'pending' as const,
+    status: 'pending' as ShowStatus,
   });
   const [showPersonnelModal, setShowPersonnelModal] = useState(false);
   const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
@@ -88,16 +90,16 @@ export default function ShowDetailPage() {
     name: '',
     role: '',
     phone: '',
-    type: 'cast' as const,
+    type: 'cast' as PersonnelType,
   });
   const [showEquipmentModal, setShowEquipmentModal] = useState(false);
   const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
   const [equipmentForm, setEquipmentForm] = useState({
     name: '',
     quantity: 1,
-    category: 'lighting' as const,
+    category: 'lighting' as EquipmentCategory,
     note: '',
-    providedBy: 'tour' as const,
+    providedBy: 'tour' as 'venue' | 'tour' | 'rental',
   });
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoForm, setPhotoForm] = useState({
@@ -106,6 +108,10 @@ export default function ShowDetailPage() {
   });
   const [personnelType, setPersonnelType] = useState<'cast' | 'crew'>('cast');
   const [equipmentCategory, setEquipmentCategory] = useState<EquipmentCategory>('lighting');
+  const [personnelSearch, setPersonnelSearch] = useState('');
+  const [personnelRoleFilter, setPersonnelRoleFilter] = useState('');
+  const [equipmentSearch, setEquipmentSearch] = useState('');
+  const [equipmentCategoryFilter, setEquipmentCategoryFilter] = useState<EquipmentCategory | 'all'>('all');
 
   useEffect(() => {
     if (show) {
@@ -187,7 +193,7 @@ export default function ShowDetailPage() {
         addPersonnel({ ...personnelForm, showId: id });
       }
       setShowPersonnelModal(false);
-      setPersonnelForm({ name: '', role: '', phone: '', type: 'cast' });
+      setPersonnelForm({ name: '', role: '', phone: '', type: 'cast' as PersonnelType });
     }
   };
 
@@ -233,9 +239,9 @@ export default function ShowDetailPage() {
       setEquipmentForm({
         name: '',
         quantity: 1,
-        category: 'lighting',
+        category: 'lighting' as EquipmentCategory,
         note: '',
-        providedBy: 'tour',
+        providedBy: 'tour' as 'venue' | 'tour' | 'rental',
       });
     }
   };
@@ -272,6 +278,55 @@ export default function ShowDetailPage() {
 
   const castMembers = personnel.filter((p) => p.type === 'cast');
   const crewMembers = personnel.filter((p) => p.type === 'crew');
+
+  const filteredCastMembers = useMemo(() => {
+    return castMembers.filter((p) => {
+      const matchSearch = !personnelSearch ||
+        p.name.toLowerCase().includes(personnelSearch.toLowerCase()) ||
+        p.role.toLowerCase().includes(personnelSearch.toLowerCase());
+      const matchRole = !personnelRoleFilter ||
+        p.role.toLowerCase().includes(personnelRoleFilter.toLowerCase());
+      return matchSearch && matchRole;
+    });
+  }, [castMembers, personnelSearch, personnelRoleFilter]);
+
+  const filteredCrewMembers = useMemo(() => {
+    return crewMembers.filter((p) => {
+      const matchSearch = !personnelSearch ||
+        p.name.toLowerCase().includes(personnelSearch.toLowerCase()) ||
+        p.role.toLowerCase().includes(personnelSearch.toLowerCase());
+      const matchRole = !personnelRoleFilter ||
+        p.role.toLowerCase().includes(personnelRoleFilter.toLowerCase());
+      return matchSearch && matchRole;
+    });
+  }, [crewMembers, personnelSearch, personnelRoleFilter]);
+
+  const filteredEquipment = useMemo(() => {
+    if (equipmentCategoryFilter === 'all') {
+      return equipment.filter((e) =>
+        !equipmentSearch ||
+        e.name.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
+        (e.note || '').toLowerCase().includes(equipmentSearch.toLowerCase())
+      );
+    }
+    return equipment.filter((e) =>
+      e.category === equipmentCategoryFilter &&
+      (!equipmentSearch ||
+        e.name.toLowerCase().includes(equipmentSearch.toLowerCase()) ||
+        (e.note || '').toLowerCase().includes(equipmentSearch.toLowerCase()))
+    );
+  }, [equipment, equipmentSearch, equipmentCategoryFilter]);
+
+  const allRoles = useMemo(() => {
+    const roles = new Set(personnel.map((p) => p.role));
+    return Array.from(roles);
+  }, [personnel]);
+
+  const handleExportToSummary = () => {
+    const personnelIds = [...filteredCastMembers, ...filteredCrewMembers].map((p) => p.id);
+    const equipmentIds = filteredEquipment.map((e) => e.id);
+    navigate(`/settlement?showId=${id}&personnelIds=${personnelIds.join(',')}&equipmentIds=${equipmentIds.join(',')}`);
+  };
 
   const equipmentByCategory = useMemo(() => {
     const categories: Record<EquipmentCategory, Equipment[]> = {
@@ -642,69 +697,47 @@ export default function ShowDetailPage() {
       )}
 
       {activeTab === 'personnel' && (
-        <div className="grid grid-cols-2 gap-6">
-          <Card>
-            <CardHeader>
-              <SectionTitle
-                icon={<Star className="w-5 h-5 text-gold-500" />}
-                title="演员名单"
-                action={
-                  <button
-                    onClick={() => handleOpenAddPersonnel('cast')}
-                    className="btn-ghost text-sm flex items-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    添加
-                  </button>
-                }
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400" />
+              <input
+                type="text"
+                value={personnelSearch}
+                onChange={(e) => setPersonnelSearch(e.target.value)}
+                placeholder="搜索姓名或角色..."
+                className="w-full pl-9 pr-3 py-2 border border-gold-200 rounded-md bg-white text-sm focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
               />
-            </CardHeader>
-            <CardBody>
-              <PersonnelList
-                list={castMembers}
-                onEdit={handleOpenEditPersonnel}
-                onDelete={handleDeletePersonnel}
-              />
-            </CardBody>
-          </Card>
+            </div>
+            <select
+              value={personnelRoleFilter}
+              onChange={(e) => setPersonnelRoleFilter(e.target.value)}
+              className="px-3 py-2 border border-gold-200 rounded-md bg-white text-sm focus:outline-none focus:border-wine-400"
+            >
+              <option value="">全部角色</option>
+              {allRoles.map((role) => (
+                <option key={role} value={role}>{role}</option>
+              ))}
+            </select>
+            <div className="flex-1"></div>
+            <button
+              onClick={handleExportToSummary}
+              className="btn-secondary text-sm flex items-center gap-1"
+            >
+              <FileText className="w-4 h-4" />
+              带筛选结果生成摘要
+            </button>
+          </div>
 
-          <Card>
-            <CardHeader>
-              <SectionTitle
-                icon={<Settings className="w-5 h-5 text-gold-500" />}
-                title="工作人员"
-                action={
-                  <button
-                    onClick={() => handleOpenAddPersonnel('crew')}
-                    className="btn-ghost text-sm flex items-center gap-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    添加
-                  </button>
-                }
-              />
-            </CardHeader>
-            <CardBody>
-              <PersonnelList
-                list={crewMembers}
-                onEdit={handleOpenEditPersonnel}
-                onDelete={handleDeletePersonnel}
-              />
-            </CardBody>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === 'equipment' && (
-        <div className="space-y-6">
-          {(['lighting', 'sound', 'stage', 'video', 'other'] as EquipmentCategory[]).map((category) => (
-            <Card key={category}>
+          <div className="grid grid-cols-2 gap-6">
+            <Card>
               <CardHeader>
                 <SectionTitle
-                  title={categoryLabels[category]}
+                  icon={<Star className="w-5 h-5 text-gold-500" />}
+                  title={`演员名单${filteredCastMembers.length !== castMembers.length ? ` (${filteredCastMembers.length}/${castMembers.length})` : ''}`}
                   action={
                     <button
-                      onClick={() => handleOpenAddEquipment(category)}
+                      onClick={() => handleOpenAddPersonnel('cast')}
                       className="btn-ghost text-sm flex items-center gap-1"
                     >
                       <Plus className="w-4 h-4" />
@@ -714,67 +747,164 @@ export default function ShowDetailPage() {
                 />
               </CardHeader>
               <CardBody>
-                {equipmentByCategory[category].length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full">
-                      <thead>
-                        <tr className="text-left text-xs text-charcoal-400 border-b border-gold-100">
-                          <th className="pb-2 font-medium">设备名称</th>
-                          <th className="pb-2 font-medium text-center">数量</th>
-                          <th className="pb-2 font-medium">提供方</th>
-                          <th className="pb-2 font-medium">备注</th>
-                          <th className="pb-2 font-medium text-right">操作</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {equipmentByCategory[category].map((item) => (
-                          <tr
-                            key={item.id}
-                            className="border-b border-gold-50 last:border-0 hover:bg-cream-50/50 transition-colors"
-                          >
-                            <td className="py-3 text-sm text-charcoal-700">
-                              {item.name}
-                            </td>
-                            <td className="py-3 text-sm text-charcoal-700 text-center font-medium">
-                              {item.quantity}
-                            </td>
-                            <td className="py-3 text-sm">
-                              <ProvidedBadge type={item.providedBy || 'tour'} />
-                            </td>
-                            <td className="py-3 text-sm text-charcoal-500">
-                              {item.note || '-'}
-                            </td>
-                            <td className="py-3 text-sm text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                <button
-                                  onClick={() => handleOpenEditEquipment(item)}
-                                  className="p-1 text-charcoal-400 hover:text-wine-600 transition-colors"
-                                  title="编辑"
-                                >
-                                  <Pencil className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteEquipment(item.id)}
-                                  className="p-1 text-charcoal-400 hover:text-red-500 transition-colors"
-                                  title="删除"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : (
-                  <p className="text-sm text-charcoal-400 text-center py-4">
-                    暂无设备，点击右上角添加
-                  </p>
-                )}
+                <PersonnelList
+                  list={filteredCastMembers}
+                  onEdit={handleOpenEditPersonnel}
+                  onDelete={handleDeletePersonnel}
+                />
               </CardBody>
             </Card>
-          ))}
+
+            <Card>
+              <CardHeader>
+                <SectionTitle
+                  icon={<Settings className="w-5 h-5 text-gold-500" />}
+                  title={`工作人员${filteredCrewMembers.length !== crewMembers.length ? ` (${filteredCrewMembers.length}/${crewMembers.length})` : ''}`}
+                  action={
+                    <button
+                      onClick={() => handleOpenAddPersonnel('crew')}
+                      className="btn-ghost text-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      添加
+                    </button>
+                  }
+                />
+              </CardHeader>
+              <CardBody>
+                <PersonnelList
+                  list={filteredCrewMembers}
+                  onEdit={handleOpenEditPersonnel}
+                  onDelete={handleDeletePersonnel}
+                />
+              </CardBody>
+            </Card>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'equipment' && (
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-charcoal-400" />
+              <input
+                type="text"
+                value={equipmentSearch}
+                onChange={(e) => setEquipmentSearch(e.target.value)}
+                placeholder="搜索设备名称或备注..."
+                className="w-full pl-9 pr-3 py-2 border border-gold-200 rounded-md bg-white text-sm focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <select
+              value={equipmentCategoryFilter}
+              onChange={(e) => setEquipmentCategoryFilter(e.target.value as EquipmentCategory | 'all')}
+              className="px-3 py-2 border border-gold-200 rounded-md bg-white text-sm focus:outline-none focus:border-wine-400"
+            >
+              <option value="all">全部分类</option>
+              <option value="lighting">灯光设备</option>
+              <option value="sound">音响设备</option>
+              <option value="stage">舞台设备</option>
+              <option value="video">视频设备</option>
+              <option value="other">其他设备</option>
+            </select>
+            <div className="flex-1"></div>
+            <button
+              onClick={handleExportToSummary}
+              className="btn-secondary text-sm flex items-center gap-1"
+            >
+              <FileText className="w-4 h-4" />
+              带筛选结果生成摘要
+            </button>
+          </div>
+
+          {(equipmentCategoryFilter === 'all'
+            ? (['lighting', 'sound', 'stage', 'video', 'other'] as EquipmentCategory[])
+            : [equipmentCategoryFilter as EquipmentCategory]
+          ).map((category) => {
+            const categoryItems = filteredEquipment.filter((e) => e.category === category);
+            if (equipmentCategoryFilter !== 'all' || categoryItems.length > 0) {
+              return (
+                <Card key={category}>
+                  <CardHeader>
+                    <SectionTitle
+                      title={`${categoryLabels[category]}${categoryItems.length > 0 ? ` (${categoryItems.length})` : ''}`}
+                      action={
+                        <button
+                          onClick={() => handleOpenAddEquipment(category)}
+                          className="btn-ghost text-sm flex items-center gap-1"
+                        >
+                          <Plus className="w-4 h-4" />
+                          添加
+                        </button>
+                      }
+                    />
+                  </CardHeader>
+                  <CardBody>
+                    {categoryItems.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="text-left text-xs text-charcoal-400 border-b border-gold-100">
+                              <th className="pb-2 font-medium">设备名称</th>
+                              <th className="pb-2 font-medium text-center">数量</th>
+                              <th className="pb-2 font-medium">提供方</th>
+                              <th className="pb-2 font-medium">备注</th>
+                              <th className="pb-2 font-medium text-right">操作</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {categoryItems.map((item) => (
+                              <tr
+                                key={item.id}
+                                className="border-b border-gold-50 last:border-0 hover:bg-cream-50/50 transition-colors"
+                              >
+                                <td className="py-3 text-sm text-charcoal-700">
+                                  {item.name}
+                                </td>
+                                <td className="py-3 text-sm text-charcoal-700 text-center font-medium">
+                                  {item.quantity}
+                                </td>
+                                <td className="py-3 text-sm">
+                                  <ProvidedBadge type={item.providedBy || 'tour'} />
+                                </td>
+                                <td className="py-3 text-sm text-charcoal-500">
+                                  {item.note || '-'}
+                                </td>
+                                <td className="py-3 text-sm text-right">
+                                  <div className="flex items-center justify-end gap-1">
+                                    <button
+                                      onClick={() => handleOpenEditEquipment(item)}
+                                      className="p-1 text-charcoal-400 hover:text-wine-600 transition-colors"
+                                      title="编辑"
+                                    >
+                                      <Pencil className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleDeleteEquipment(item.id)}
+                                      className="p-1 text-charcoal-400 hover:text-red-500 transition-colors"
+                                      title="删除"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-charcoal-400 text-center py-4">
+                        暂无设备，点击右上角添加
+                      </p>
+                    )}
+                  </CardBody>
+                </Card>
+              );
+            }
+            return null;
+          })}
         </div>
       )}
 
