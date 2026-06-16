@@ -27,12 +27,15 @@ export default function CalendarPage() {
   const shows = useTourStore((state) => state.shows);
   const duplicateShow = useTourStore((state) => state.duplicateShow);
   const addShow = useTourStore((state) => state.addShow);
+  const materials = useTourStore((state) => state.materials);
+  const issues = useTourStore((state) => state.issues);
 
   const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1));
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewMode, setViewMode] = useState<'calendar' | 'route'>('calendar');
   const [showTransitionModal, setShowTransitionModal] = useState(false);
   const [transitionPair, setTransitionPair] = useState<{ from: Show; to: Show } | null>(null);
+  const [resolvedRisks, setResolvedRisks] = useState<Set<string>>(new Set());
   const [newShow, setNewShow] = useState({
     city: '',
     venue: '',
@@ -859,6 +862,144 @@ export default function CalendarPage() {
                 </div>
               </CardBody>
             </Card>
+
+            {(() => {
+              const gapDays = getDaysBetween(transitionPair.from.date, transitionPair.to.date);
+              const fromMaterials = materials.filter((m) => m.showId === transitionPair.from.id);
+              const toMaterials = materials.filter((m) => m.showId === transitionPair.to.id);
+              const fromIssues = issues.filter((i) => i.showId === transitionPair.from.id && i.status !== 'resolved');
+              const toIssues = issues.filter((i) => i.showId === transitionPair.to.id && i.status !== 'resolved');
+              const undeliveredMaterials = toMaterials.filter((m) => m.status !== 'delivered');
+
+              const risks: { id: string; level: 'high' | 'medium' | 'low'; category: string; title: string; suggestion: string }[] = [];
+
+              if (gapDays <= 1) {
+                risks.push({
+                  id: 'time-tight',
+                  level: 'high',
+                  category: '时间',
+                  title: '转场时间极紧',
+                  suggestion: '安排当晚连夜撤场运输，提前联系下一站确认可提前进场',
+                });
+              } else if (gapDays <= 2) {
+                risks.push({
+                  id: 'time-short',
+                  level: 'medium',
+                  category: '时间',
+                  title: '转场时间偏紧',
+                  suggestion: '确认运输方案已落实，预留搭建缓冲时间',
+                });
+              }
+
+              if (undeliveredMaterials.length > 0) {
+                risks.push({
+                  id: 'material-undelivered',
+                  level: undeliveredMaterials.some((m) => m.status === 'not_started') ? 'high' : 'medium',
+                  category: '物料',
+                  title: `${undeliveredMaterials.length} 项物料未到位`,
+                  suggestion: `联系物流确认到达时间：${undeliveredMaterials.map((m) => m.name).join('、')}`,
+                });
+              }
+
+              fromIssues.forEach((issue) => {
+                risks.push({
+                  id: `from-issue-${issue.id}`,
+                  level: 'medium',
+                  category: '待办',
+                  title: `上一站未解决：${issue.title}`,
+                  suggestion: `由 ${issue.assignee} 跟进处理`,
+                });
+              });
+
+              toIssues.forEach((issue) => {
+                risks.push({
+                  id: `to-issue-${issue.id}`,
+                  level: 'low',
+                  category: '待办',
+                  title: `下一站待办：${issue.title}`,
+                  suggestion: `提前确认 ${issue.assignee} 已知晓并准备`,
+                });
+              });
+
+              const toggleRisk = (riskId: string) => {
+                setResolvedRisks((prev) => {
+                  const next = new Set(prev);
+                  if (next.has(riskId)) {
+                    next.delete(riskId);
+                  } else {
+                    next.add(riskId);
+                  }
+                  return next;
+                });
+              };
+
+              const resolvedCount = risks.filter((r) => resolvedRisks.has(r.id)).length;
+
+              return risks.length > 0 ? (
+                <Card>
+                  <CardHeader>
+                    <SectionTitle
+                      icon={<AlertCircle className="w-4 h-4 text-gold-500" />}
+                      title={`转场风险清单 (${resolvedCount}/${risks.length} 已处理)`}
+                    />
+                  </CardHeader>
+                  <CardBody>
+                    <div className="space-y-3">
+                      {risks.map((risk) => {
+                        const isResolved = resolvedRisks.has(risk.id);
+                        return (
+                          <div
+                            key={risk.id}
+                            className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+                              isResolved
+                                ? 'bg-emerald-50/50 border-emerald-200'
+                                : risk.level === 'high'
+                                ? 'bg-red-50/50 border-red-200'
+                                : risk.level === 'medium'
+                                ? 'bg-amber-50/50 border-amber-200'
+                                : 'bg-cream-50 border-gold-200'
+                            }`}
+                          >
+                            <button
+                              onClick={() => toggleRisk(risk.id)}
+                              className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors ${
+                                isResolved
+                                  ? 'bg-emerald-500 border-emerald-500'
+                                  : 'border-charcoal-300 hover:border-wine-400'
+                              }`}
+                            >
+                              {isResolved && <CheckCircle2 className="w-3 h-3 text-white" />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                  risk.level === 'high' ? 'bg-red-100 text-red-700' :
+                                  risk.level === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                  'bg-cream-100 text-charcoal-600'
+                                }`}>{risk.category}</span>
+                                <span className={`text-sm font-medium ${isResolved ? 'text-charcoal-400 line-through' : 'text-charcoal-700'}`}>
+                                  {risk.title}
+                                </span>
+                              </div>
+                              <p className={`text-xs ${isResolved ? 'text-charcoal-300' : 'text-charcoal-500'}`}>
+                                💡 {risk.suggestion}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </CardBody>
+                </Card>
+              ) : (
+                <Card>
+                  <CardBody className="text-center py-6">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-400 mx-auto mb-2" />
+                    <p className="text-sm text-emerald-600 font-medium">暂无转场风险</p>
+                  </CardBody>
+                </Card>
+              );
+            })()}
 
             <div className="flex gap-3">
               <button

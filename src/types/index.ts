@@ -119,15 +119,31 @@ export interface ReminderItem {
   isUrgent: boolean;
 }
 
+export type TemplateCategory = 'personnel' | 'equipment' | 'material' | 'issue';
+
+export interface HandoverConfirmation {
+  id: string;
+  showId: string;
+  confirmer: string;
+  sections: SummarySection[];
+  confirmedAt: string;
+}
+
+export type SummarySection = 'basic' | 'ticket' | 'personnel' | 'equipment' | 'material' | 'issue' | 'settlement';
+
 export interface HandoverTemplate {
   id: string;
   name: string;
   description?: string;
+  category: TemplateCategory;
   personnelIds: string[];
   equipmentIds: string[];
+  materialIds: string[];
+  issueIds: string[];
   personnelSearch: string;
   personnelRoleFilter: string;
   equipmentSearch: string;
   equipmentCategoryFilter: EquipmentCategory | 'all';
+  sourceShowId?: string;
   createdAt: string;
 }

@@ -21,6 +21,7 @@ import {
   X,
   Search,
   FileText,
+  CheckCircle,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -30,7 +31,7 @@ import {
   MaterialStatusBadge,
 } from '../components/StatusBadge';
 import Modal from '../components/Modal';
-import type { Personnel, Equipment, Issue, EquipmentCategory, ShowStatus, PersonnelType, HandoverTemplate } from '../types';
+import type { Personnel, Equipment, Issue, EquipmentCategory, ShowStatus, PersonnelType, HandoverTemplate, TemplateCategory } from '../types';
 
 export default function ShowDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -55,6 +56,7 @@ export default function ShowDetailPage() {
   const addVenuePhoto = useTourStore((state) => state.addVenuePhoto);
   const deleteVenuePhoto = useTourStore((state) => state.deleteVenuePhoto);
   const handoverTemplates = useTourStore((state) => state.handoverTemplates);
+  const handoverConfirmations = useTourStore((state) => state.handoverConfirmations);
   const addHandoverTemplate = useTourStore((state) => state.addHandoverTemplate);
   const deleteHandoverTemplate = useTourStore((state) => state.deleteHandoverTemplate);
 
@@ -65,7 +67,7 @@ export default function ShowDetailPage() {
   const photos = allPhotos.filter((p) => p.showId === id);
   const materials = allMaterials.filter((m) => m.showId === id);
 
-  const [activeTab, setActiveTab] = useState<'info' | 'personnel' | 'equipment' | 'issues'>('info');
+  const [activeTab, setActiveTab] = useState<'info' | 'personnel' | 'equipment' | 'issues' | 'confirmations'>('info');
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [newIssue, setNewIssue] = useState({ title: '', assignee: '', dueDate: '' });
   const [showEditModal, setShowEditModal] = useState(false);
@@ -119,6 +121,8 @@ export default function ShowDetailPage() {
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [newTemplateDesc, setNewTemplateDesc] = useState('');
+  const [newTemplateCategory, setNewTemplateCategory] = useState<TemplateCategory>('personnel');
+  const [templateCategoryFilter, setTemplateCategoryFilter] = useState<TemplateCategory | 'all'>('all');
 
   useEffect(() => {
     if (show) {
@@ -339,27 +343,57 @@ export default function ShowDetailPage() {
     if (!newTemplateName.trim()) return;
     const personnelIds = [...filteredCastMembers, ...filteredCrewMembers].map((p) => p.id);
     const equipmentIds = filteredEquipment.map((e) => e.id);
+    const showMaterialIds = allMaterials.filter((m) => m.showId === id).map((m) => m.id);
+    const showIssueIds = issues.filter((i) => i.showId === id).map((i) => i.id);
     addHandoverTemplate({
       name: newTemplateName.trim(),
       description: newTemplateDesc.trim(),
+      category: newTemplateCategory,
       personnelIds,
       equipmentIds,
+      materialIds: newTemplateCategory === 'material' ? showMaterialIds : [],
+      issueIds: newTemplateCategory === 'issue' ? showIssueIds : [],
       personnelSearch,
       personnelRoleFilter,
       equipmentSearch,
       equipmentCategoryFilter,
+      sourceShowId: id,
     });
     setShowSaveTemplateModal(false);
     setNewTemplateName('');
     setNewTemplateDesc('');
+    setNewTemplateCategory('personnel');
   };
 
   const applyTemplate = (template: HandoverTemplate) => {
-    setPersonnelSearch(template.personnelSearch);
-    setPersonnelRoleFilter(template.personnelRoleFilter);
-    setEquipmentSearch(template.equipmentSearch);
-    setEquipmentCategoryFilter(template.equipmentCategoryFilter);
+    if (template.category === 'personnel' || template.category === 'equipment') {
+      setPersonnelSearch(template.personnelSearch);
+      setPersonnelRoleFilter(template.personnelRoleFilter);
+      setEquipmentSearch(template.equipmentSearch);
+      setEquipmentCategoryFilter(template.equipmentCategoryFilter);
+    }
     setShowTemplateModal(false);
+  };
+
+  const getMatchCount = (template: HandoverTemplate) => {
+    if (!id) return 0;
+    if (template.category === 'personnel') {
+      const showPids = [...filteredCastMembers, ...filteredCrewMembers].map((p) => p.id);
+      return template.personnelIds.filter((pid) => showPids.includes(pid)).length;
+    }
+    if (template.category === 'equipment') {
+      const showEids = filteredEquipment.map((e) => e.id);
+      return template.equipmentIds.filter((eid) => showEids.includes(eid)).length;
+    }
+    if (template.category === 'material') {
+      const showMids = allMaterials.filter((m) => m.showId === id).map((m) => m.id);
+      return template.materialIds.filter((mid) => showMids.includes(mid)).length;
+    }
+    if (template.category === 'issue') {
+      const showIids = issues.filter((i) => i.showId === id).map((i) => i.id);
+      return template.issueIds.filter((iid) => showIids.includes(iid)).length;
+    }
+    return 0;
   };
 
   const equipmentByCategory = useMemo(() => {
@@ -424,6 +458,7 @@ export default function ShowDetailPage() {
     { key: 'personnel', label: '人员名单', icon: Users },
     { key: 'equipment', label: '设备需求', icon: Settings },
     { key: 'issues', label: '待确认问题', icon: AlertTriangle },
+    { key: 'confirmations', label: '交接确认', icon: CheckCircle },
   ];
 
   return (
@@ -1046,6 +1081,69 @@ export default function ShowDetailPage() {
         </Card>
       )}
 
+      {activeTab === 'confirmations' && (() => {
+        const confirmations = handoverConfirmations.filter((c) => c.showId === id);
+        const sectionLabels: Record<string, string> = {
+          basic: '基础信息',
+          ticket: '票务结算',
+          personnel: '人员名单',
+          equipment: '设备清单',
+          material: '物料状态',
+          issue: '待办问题',
+          settlement: '结算口径',
+        };
+        return (
+          <Card>
+            <CardHeader>
+              <SectionTitle
+                icon={<CheckCircle className="w-5 h-5 text-gold-500" />}
+                title="交接确认记录"
+              />
+            </CardHeader>
+            <CardBody>
+              {confirmations.length === 0 ? (
+                <div className="text-center py-8">
+                  <CheckCircle className="w-10 h-10 text-charcoal-200 mx-auto mb-3" />
+                  <p className="text-charcoal-400 text-sm">暂无确认记录</p>
+                  <p className="text-charcoal-300 text-xs mt-1">在结算归档的交接包视图中提交确认后会在此显示</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {confirmations.map((c) => (
+                    <div key={c.id} className="p-4 border border-gold-200 rounded-lg">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-full bg-wine-100 flex items-center justify-center">
+                            <span className="text-sm font-medium text-wine-700">{c.confirmer.charAt(0)}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium text-charcoal-700 text-sm">{c.confirmer}</p>
+                            <p className="text-xs text-charcoal-400">{c.confirmedAt}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs px-2 py-1 rounded-full bg-emerald-50 text-emerald-700">
+                          {c.sections.length} 模块
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {c.sections.map((s) => (
+                          <span
+                            key={s}
+                            className="text-xs px-2 py-1 rounded bg-cream-50 text-charcoal-600 border border-gold-100"
+                          >
+                            {sectionLabels[s] || s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardBody>
+          </Card>
+        );
+      })()}
+
       <Modal
         isOpen={showIssueModal}
         onClose={() => setShowIssueModal(false)}
@@ -1605,6 +1703,31 @@ export default function ShowDetailPage() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              模板分类 <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-2">
+              {([
+                { key: 'personnel', label: '人员' },
+                { key: 'equipment', label: '设备' },
+                { key: 'material', label: '物料' },
+                { key: 'issue', label: '待办' },
+              ] as const).map((cat) => (
+                <button
+                  key={cat.key}
+                  onClick={() => setNewTemplateCategory(cat.key)}
+                  className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                    newTemplateCategory === cat.key
+                      ? 'bg-wine-100 border-wine-300 text-wine-700 font-medium'
+                      : 'bg-cream-50 border-gold-200 text-charcoal-500'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
               模板名称 <span className="text-red-500">*</span>
             </label>
             <input
@@ -1622,23 +1745,19 @@ export default function ShowDetailPage() {
             <textarea
               value={newTemplateDesc}
               onChange={(e) => setNewTemplateDesc(e.target.value)}
-              rows={3}
+              rows={2}
               placeholder="描述这个模板的用途..."
               className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400 resize-none"
             />
           </div>
           <div className="p-3 bg-cream-50 rounded-lg text-sm text-charcoal-500">
-            <p>当前筛选将被保存：</p>
+            <p>当前筛选将被保存到「{newTemplateCategory === 'personnel' ? '人员' : newTemplateCategory === 'equipment' ? '设备' : newTemplateCategory === 'material' ? '物料' : '待办'}」分类：</p>
             <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
               <div>
                 人员: {[...filteredCastMembers, ...filteredCrewMembers].length} 人
-                {personnelSearch && <span className="text-wine-600"> · 搜索 "{personnelSearch}"</span>}
-                {personnelRoleFilter && <span className="text-wine-600"> · 角色 "{personnelRoleFilter}"</span>}
               </div>
               <div>
                 设备: {filteredEquipment.length} 项
-                {equipmentSearch && <span className="text-wine-600"> · 搜索 "{equipmentSearch}"</span>}
-                {equipmentCategoryFilter !== 'all' && <span className="text-wine-600"> · 分类 "{equipmentCategoryFilter}"</span>}
               </div>
             </div>
           </div>
@@ -1648,58 +1767,94 @@ export default function ShowDetailPage() {
       <Modal
         isOpen={showTemplateModal}
         onClose={() => setShowTemplateModal(false)}
-        title="套用交接模板"
+        title="模板库"
         size="lg"
       >
-        <div className="space-y-3">
-          {handoverTemplates.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="w-12 h-12 text-charcoal-200 mx-auto mb-3" />
-              <p className="text-charcoal-400">暂无模板，点击「保存为模板」创建</p>
-            </div>
-          ) : (
-            handoverTemplates.map((template) => (
-              <div
-                key={template.id}
-                className="flex items-center justify-between p-4 border border-gold-200 rounded-lg hover:bg-cream-50 transition-colors group"
+        <div className="space-y-4">
+          <div className="flex gap-2">
+            {([
+              { key: 'all', label: '全部' },
+              { key: 'personnel', label: '人员' },
+              { key: 'equipment', label: '设备' },
+              { key: 'material', label: '物料' },
+              { key: 'issue', label: '待办' },
+            ] as const).map((cat) => (
+              <button
+                key={cat.key}
+                onClick={() => setTemplateCategoryFilter(cat.key)}
+                className={`px-3 py-1.5 rounded-full text-sm border transition-colors ${
+                  templateCategoryFilter === cat.key
+                    ? 'bg-wine-100 border-wine-300 text-wine-700 font-medium'
+                    : 'bg-cream-50 border-gold-200 text-charcoal-500 hover:bg-cream-100'
+                }`}
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <h4 className="font-medium text-charcoal-700">{template.name}</h4>
-                    <span className="text-xs text-charcoal-400">{template.createdAt}</span>
-                  </div>
-                  {template.description && (
-                    <p className="text-sm text-charcoal-500 mt-1">{template.description}</p>
-                  )}
-                  <div className="flex items-center gap-4 mt-2 text-xs text-charcoal-400">
-                    <span>人员 {template.personnelIds.length} 人</span>
-                    <span>设备 {template.equipmentIds.length} 项</span>
-                    {template.personnelSearch && <span>搜索: {template.personnelSearch}</span>}
-                    {template.equipmentCategoryFilter !== 'all' && <span>分类: {template.equipmentCategoryFilter}</span>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 ml-4">
-                  <button
-                    onClick={() => applyTemplate(template)}
-                    className="btn-primary text-sm"
-                  >
-                    套用
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (confirm('确定要删除这个模板吗？')) {
-                        deleteHandoverTemplate(template.id);
-                      }
-                    }}
-                    className="p-1.5 text-charcoal-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
-                    title="删除模板"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
-                </div>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+
+          {(() => {
+            const filtered = templateCategoryFilter === 'all'
+              ? handoverTemplates
+              : handoverTemplates.filter((t) => t.category === templateCategoryFilter);
+            return filtered.length === 0 ? (
+              <div className="text-center py-8">
+                <FileText className="w-12 h-12 text-charcoal-200 mx-auto mb-3" />
+                <p className="text-charcoal-400">
+                  {templateCategoryFilter === 'all' ? '暂无模板' : `${templateCategoryFilter === 'personnel' ? '人员' : templateCategoryFilter === 'equipment' ? '设备' : templateCategoryFilter === 'material' ? '物料' : '待办'}分类暂无模板`}
+                  ，点击「保存为模板」创建
+                </p>
               </div>
-            ))
-          )}
+            ) : (
+              <div className="space-y-3">
+                {filtered.map((template) => {
+                  const matchCount = getMatchCount(template);
+                  const categoryLabel = template.category === 'personnel' ? '人员' : template.category === 'equipment' ? '设备' : template.category === 'material' ? '物料' : '待办';
+                  const itemCount = template.category === 'personnel' ? template.personnelIds.length : template.category === 'equipment' ? template.equipmentIds.length : template.category === 'material' ? template.materialIds.length : template.issueIds.length;
+                  return (
+                    <div
+                      key={template.id}
+                      className="flex items-center justify-between p-4 border border-gold-200 rounded-lg hover:bg-cream-50 transition-colors group"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs px-1.5 py-0.5 rounded bg-wine-100 text-wine-700">{categoryLabel}</span>
+                          <h4 className="font-medium text-charcoal-700">{template.name}</h4>
+                          <span className="text-xs text-charcoal-400">{template.createdAt}</span>
+                        </div>
+                        {template.description && (
+                          <p className="text-sm text-charcoal-500 mt-1">{template.description}</p>
+                        )}
+                        <div className="flex items-center gap-4 mt-2 text-xs text-charcoal-400">
+                          <span>{itemCount} 项</span>
+                          <span className="text-wine-600 font-medium">匹配 {matchCount} 项</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={() => applyTemplate(template)}
+                          className="btn-primary text-sm"
+                        >
+                          套用
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (confirm('确定要删除这个模板吗？')) {
+                              deleteHandoverTemplate(template.id);
+                            }
+                          }}
+                          className="p-1.5 text-charcoal-400 hover:text-red-500 transition-colors opacity-0 group-hover:opacity-100"
+                          title="删除模板"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       </Modal>
     </div>

@@ -11,6 +11,7 @@ import type {
   Settlement,
   ReminderItem,
   HandoverTemplate,
+  HandoverConfirmation,
 } from '../types';
 import {
   mockShows,
@@ -35,6 +36,7 @@ interface TourState {
   settlements: Settlement[];
   reminders: ReminderItem[];
   handoverTemplates: HandoverTemplate[];
+  handoverConfirmations: HandoverConfirmation[];
   currentShowId: string | null;
 
   setCurrentShowId: (id: string | null) => void;
@@ -70,6 +72,8 @@ interface TourState {
   addHandoverTemplate: (template: Omit<HandoverTemplate, 'id' | 'createdAt'>) => void;
   updateHandoverTemplate: (id: string, updates: Partial<HandoverTemplate>) => void;
   deleteHandoverTemplate: (id: string) => void;
+
+  addHandoverConfirmation: (confirmation: Omit<HandoverConfirmation, 'id'>) => void;
 }
 
 const generateId = (prefix: string) =>
@@ -88,6 +92,7 @@ export const useTourStore = create<TourState>()(
       settlements: mockSettlements,
       reminders: mockReminders,
       handoverTemplates: [],
+      handoverConfirmations: [],
       currentShowId: null,
 
       setCurrentShowId: (id) => set({ currentShowId: id }),
@@ -383,6 +388,14 @@ export const useTourStore = create<TourState>()(
       deleteHandoverTemplate: (id) =>
         set((state) => ({
           handoverTemplates: state.handoverTemplates.filter((t) => t.id !== id),
+        })),
+
+      addHandoverConfirmation: (confirmation) =>
+        set((state) => ({
+          handoverConfirmations: [
+            ...state.handoverConfirmations,
+            { ...confirmation, id: generateId('conf') },
+          ],
         })),
     }),
     {

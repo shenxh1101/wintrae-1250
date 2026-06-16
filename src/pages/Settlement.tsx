@@ -26,8 +26,7 @@ import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
 import { ShowStatusBadge } from '../components/StatusBadge';
 import Modal from '../components/Modal';
-
-type SummarySection = 'basic' | 'ticket' | 'personnel' | 'equipment' | 'material' | 'issue' | 'settlement';
+import type { SummarySection } from '../types';
 
 const SUMMARY_SECTIONS: { key: SummarySection; label: string }[] = [
   { key: 'basic', label: '基础信息' },
@@ -53,6 +52,8 @@ export default function SettlementPage() {
   const materials = useTourStore((state) => state.materials);
   const issues = useTourStore((state) => state.issues);
   const archiveShow = useTourStore((state) => state.archiveShow);
+  const addHandoverConfirmation = useTourStore((state) => state.addHandoverConfirmation);
+  const handoverConfirmations = useTourStore((state) => state.handoverConfirmations);
 
   const [selectedShow, setSelectedShow] = useState<string | null>(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
@@ -74,6 +75,8 @@ export default function SettlementPage() {
   const [filteredEquipmentIds, setFilteredEquipmentIds] = useState<string[] | null>(null);
   const [summaryViewMode, setSummaryViewMode] = useState<'text' | 'package'>('text');
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['basic', 'contact']));
+  const [confirmedSections, setConfirmedSections] = useState<Set<SummarySection>>(new Set());
+  const [confirmerName, setConfirmerName] = useState('');
 
   useEffect(() => {
     if (urlShowId) {
@@ -102,7 +105,9 @@ export default function SettlementPage() {
     ? settlements.find((s) => s.showId === selectedShow)
     : null;
 
-  const isArchived = selectedSettlement?.isArchived ?? false;
+  const isArchived = selectedShow
+    ? (selectedSettlement?.isArchived ?? false) || (shows.find((s) => s.id === selectedShow)?.status === 'archived')
+    : false;
 
   useEffect(() => {
     if (selectedShow) {
@@ -163,6 +168,8 @@ export default function SettlementPage() {
     setFilteredEquipmentIds(null);
     setSummaryViewMode('text');
     setExpandedSections(new Set(['basic', 'contact']));
+    setConfirmedSections(new Set());
+    setConfirmerName('');
     setShowSummaryModal(true);
   };
 
@@ -196,6 +203,30 @@ export default function SettlementPage() {
       }
       return next;
     });
+  };
+
+  const toggleConfirmedSection = (key: SummarySection) => {
+    setConfirmedSections((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  const handleConfirmHandover = () => {
+    if (!summaryShowId || !confirmerName.trim() || confirmedSections.size === 0) return;
+    addHandoverConfirmation({
+      showId: summaryShowId,
+      confirmer: confirmerName.trim(),
+      sections: Array.from(confirmedSections),
+      confirmedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+    });
+    setConfirmerName('');
+    setConfirmedSections(new Set());
   };
 
   const getStatusText = (status: string) => {
@@ -1132,24 +1163,85 @@ ${showIssues.map((i) => `  [${i.status === 'resolved' ? '✓' : ' '}] ${i.title}
                     .filter((s) => summarySections.includes(s.section))
                     .map((ps) => (
                       <div key={ps.key} className="border border-gold-200 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => toggleSectionExpand(ps.key)}
-                          className="w-full flex items-center justify-between p-3 bg-cream-50 hover:bg-cream-100 transition-colors"
-                        >
-                          <div className="flex items-center gap-2">
-                            <span className="w-6 h-6 rounded bg-wine-100 text-wine-600 flex items-center justify-center">
-                              {ps.icon}
-                            </span>
-                            <span className="font-medium text-charcoal-700">{ps.title}</span>
-                          </div>
-                          <ChevronDown className={`w-4 h-4 text-charcoal-400 transition-transform ${expandedSections.has(ps.key) ? 'rotate-180' : ''}`} />
-                        </button>
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => toggleSectionExpand(ps.key)}
+                            className="flex-1 flex items-center justify-between p-3 bg-cream-50 hover:bg-cream-100 transition-colors"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span className="w-6 h-6 rounded bg-wine-100 text-wine-600 flex items-center justify-center">
+                                {ps.icon}
+                              </span>
+                              <span className="font-medium text-charcoal-700">{ps.title}</span>
+                            </div>
+                            <ChevronDown className={`w-4 h-4 text-charcoal-400 transition-transform ${expandedSections.has(ps.key) ? 'rotate-180' : ''}`} />
+                          </button>
+                          <label className="flex items-center gap-1.5 px-3 cursor-pointer border-l border-gold-100 bg-cream-50 hover:bg-cream-100 transition-colors">
+                            <input
+                              type="checkbox"
+                              checked={confirmedSections.has(ps.section)}
+                              onChange={() => toggleConfirmedSection(ps.section)}
+                              className="rounded border-gold-300 text-wine-600 focus:ring-wine-400"
+                            />
+                            <span className="text-xs text-charcoal-500 whitespace-nowrap">已确认</span>
+                          </label>
+                        </div>
                         {expandedSections.has(ps.key) && (
                           <div className="p-4 border-t border-gold-100">{ps.content}</div>
                         )}
                       </div>
                     ));
                 })()}
+
+                {summaryViewMode === 'package' && summaryShowId && (
+                  <div className="mt-4 p-4 bg-cream-50 rounded-lg border border-gold-200/50 space-y-3">
+                    <h4 className="text-sm font-medium text-charcoal-700">现场交接确认</h4>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="text"
+                        value={confirmerName}
+                        onChange={(e) => setConfirmerName(e.target.value)}
+                        placeholder="确认人姓名"
+                        className="flex-1 px-3 py-2 border border-gold-200 rounded-md bg-white text-sm focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+                      />
+                      <button
+                        onClick={handleConfirmHandover}
+                        disabled={!confirmerName.trim() || confirmedSections.size === 0}
+                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                          !confirmerName.trim() || confirmedSections.size === 0
+                            ? 'bg-charcoal-100 text-charcoal-400 cursor-not-allowed'
+                            : 'bg-wine-600 text-white hover:bg-wine-700'
+                        }`}
+                      >
+                        提交确认 ({confirmedSections.size} 模块)
+                      </button>
+                    </div>
+                    {confirmedSections.size > 0 && (
+                      <p className="text-xs text-charcoal-500">
+                        已勾选确认：{Array.from(confirmedSections).map((s) => SUMMARY_SECTIONS.find((ss) => ss.key === s)?.label).join('、')}
+                      </p>
+                    )}
+                    {(() => {
+                      const confirmations = handoverConfirmations.filter((c) => c.showId === summaryShowId);
+                      return confirmations.length > 0 ? (
+                        <div className="space-y-2 pt-2 border-t border-gold-200">
+                          <p className="text-xs font-medium text-charcoal-600">确认记录</p>
+                          {confirmations.map((c) => (
+                            <div key={c.id} className="flex items-start gap-2 text-xs">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                              <div>
+                                <span className="font-medium text-charcoal-700">{c.confirmer}</span>
+                                <span className="text-charcoal-400"> 确认了 </span>
+                                <span className="text-wine-600">{c.sections.map((s) => SUMMARY_SECTIONS.find((ss) => ss.key === s)?.label).join('、')}</span>
+                                <span className="text-charcoal-400"> · {c.confirmedAt}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
               </div>
             )}
           </div>
