@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -16,6 +16,9 @@ import {
   Phone,
   Building,
   Package,
+  Trash2,
+  Pencil,
+  X,
 } from 'lucide-react';
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
@@ -41,6 +44,14 @@ export default function ShowDetailPage() {
   const addIssue = useTourStore((state) => state.addIssue);
   const updateIssue = useTourStore((state) => state.updateIssue);
   const duplicateShow = useTourStore((state) => state.duplicateShow);
+  const addPersonnel = useTourStore((state) => state.addPersonnel);
+  const updatePersonnel = useTourStore((state) => state.updatePersonnel);
+  const deletePersonnel = useTourStore((state) => state.deletePersonnel);
+  const addEquipment = useTourStore((state) => state.addEquipment);
+  const updateEquipment = useTourStore((state) => state.updateEquipment);
+  const deleteEquipment = useTourStore((state) => state.deleteEquipment);
+  const addVenuePhoto = useTourStore((state) => state.addVenuePhoto);
+  const deleteVenuePhoto = useTourStore((state) => state.deleteVenuePhoto);
 
   const show = shows.find((s) => s.id === id);
   const personnel = allPersonnel.filter((p) => p.showId === id);
@@ -52,6 +63,212 @@ export default function ShowDetailPage() {
   const [activeTab, setActiveTab] = useState<'info' | 'personnel' | 'equipment' | 'issues'>('info');
   const [showIssueModal, setShowIssueModal] = useState(false);
   const [newIssue, setNewIssue] = useState({ title: '', assignee: '', dueDate: '' });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editShow, setEditShow] = useState({
+    city: '',
+    venue: '',
+    venueAddress: '',
+    venueContact: '',
+    venuePhone: '',
+    date: '',
+    startTime: '',
+    endTime: '',
+    loadInTime: '',
+    rehearsalTime: '',
+    loadOutTime: '',
+    notes: '',
+    ticketTotal: 0,
+    ticketPriceVip: 0,
+    ticketPriceStandard: 0,
+    status: 'pending' as const,
+  });
+  const [showPersonnelModal, setShowPersonnelModal] = useState(false);
+  const [editingPersonnel, setEditingPersonnel] = useState<Personnel | null>(null);
+  const [personnelForm, setPersonnelForm] = useState({
+    name: '',
+    role: '',
+    phone: '',
+    type: 'cast' as const,
+  });
+  const [showEquipmentModal, setShowEquipmentModal] = useState(false);
+  const [editingEquipment, setEditingEquipment] = useState<Equipment | null>(null);
+  const [equipmentForm, setEquipmentForm] = useState({
+    name: '',
+    quantity: 1,
+    category: 'lighting' as const,
+    note: '',
+    providedBy: 'tour' as const,
+  });
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [photoForm, setPhotoForm] = useState({
+    url: '',
+    description: '',
+  });
+  const [personnelType, setPersonnelType] = useState<'cast' | 'crew'>('cast');
+  const [equipmentCategory, setEquipmentCategory] = useState<EquipmentCategory>('lighting');
+
+  useEffect(() => {
+    if (show) {
+      setEditShow({
+        city: show.city,
+        venue: show.venue,
+        venueAddress: show.venueAddress || '',
+        venueContact: show.venueContact || '',
+        venuePhone: show.venuePhone || '',
+        date: show.date,
+        startTime: show.startTime,
+        endTime: show.endTime,
+        loadInTime: show.loadInTime,
+        rehearsalTime: show.rehearsalTime,
+        loadOutTime: show.loadOutTime,
+        notes: show.notes || '',
+        ticketTotal: show.ticketTotal,
+        ticketPriceVip: show.ticketPriceVip,
+        ticketPriceStandard: show.ticketPriceStandard,
+        status: show.status,
+      });
+    }
+  }, [show]);
+
+  const handleOpenEdit = () => {
+    if (show) {
+      setEditShow({
+        city: show.city,
+        venue: show.venue,
+        venueAddress: show.venueAddress || '',
+        venueContact: show.venueContact || '',
+        venuePhone: show.venuePhone || '',
+        date: show.date,
+        startTime: show.startTime,
+        endTime: show.endTime,
+        loadInTime: show.loadInTime,
+        rehearsalTime: show.rehearsalTime,
+        loadOutTime: show.loadOutTime,
+        notes: show.notes || '',
+        ticketTotal: show.ticketTotal,
+        ticketPriceVip: show.ticketPriceVip,
+        ticketPriceStandard: show.ticketPriceStandard,
+        status: show.status,
+      });
+      setShowEditModal(true);
+    }
+  };
+
+  const handleSaveEdit = () => {
+    if (id) {
+      updateShow(id, editShow);
+      setShowEditModal(false);
+    }
+  };
+
+  const handleOpenAddPersonnel = (type: 'cast' | 'crew') => {
+    setPersonnelType(type);
+    setEditingPersonnel(null);
+    setPersonnelForm({ name: '', role: '', phone: '', type });
+    setShowPersonnelModal(true);
+  };
+
+  const handleOpenEditPersonnel = (person: Personnel) => {
+    setEditingPersonnel(person);
+    setPersonnelForm({
+      name: person.name,
+      role: person.role,
+      phone: person.phone,
+      type: person.type,
+    });
+    setShowPersonnelModal(true);
+  };
+
+  const handleSavePersonnel = () => {
+    if (id && personnelForm.name) {
+      if (editingPersonnel) {
+        updatePersonnel(editingPersonnel.id, personnelForm);
+      } else {
+        addPersonnel({ ...personnelForm, showId: id });
+      }
+      setShowPersonnelModal(false);
+      setPersonnelForm({ name: '', role: '', phone: '', type: 'cast' });
+    }
+  };
+
+  const handleDeletePersonnel = (personId: string) => {
+    if (confirm('确定要删除这个人员吗？')) {
+      deletePersonnel(personId);
+    }
+  };
+
+  const handleOpenAddEquipment = (category: EquipmentCategory) => {
+    setEquipmentCategory(category);
+    setEditingEquipment(null);
+    setEquipmentForm({
+      name: '',
+      quantity: 1,
+      category,
+      note: '',
+      providedBy: 'tour',
+    });
+    setShowEquipmentModal(true);
+  };
+
+  const handleOpenEditEquipment = (item: Equipment) => {
+    setEditingEquipment(item);
+    setEquipmentForm({
+      name: item.name,
+      quantity: item.quantity,
+      category: item.category,
+      note: item.note || '',
+      providedBy: item.providedBy || 'tour',
+    });
+    setShowEquipmentModal(true);
+  };
+
+  const handleSaveEquipment = () => {
+    if (id && equipmentForm.name) {
+      if (editingEquipment) {
+        updateEquipment(editingEquipment.id, equipmentForm);
+      } else {
+        addEquipment({ ...equipmentForm, showId: id });
+      }
+      setShowEquipmentModal(false);
+      setEquipmentForm({
+        name: '',
+        quantity: 1,
+        category: 'lighting',
+        note: '',
+        providedBy: 'tour',
+      });
+    }
+  };
+
+  const handleDeleteEquipment = (itemId: string) => {
+    if (confirm('确定要删除这个设备吗？')) {
+      deleteEquipment(itemId);
+    }
+  };
+
+  const handleOpenAddPhoto = () => {
+    setPhotoForm({ url: '', description: '' });
+    setShowPhotoModal(true);
+  };
+
+  const handleSavePhoto = () => {
+    if (id && photoForm.url) {
+      addVenuePhoto({
+        showId: id,
+        url: photoForm.url,
+        description: photoForm.description,
+        uploadedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
+      });
+      setShowPhotoModal(false);
+      setPhotoForm({ url: '', description: '' });
+    }
+  };
+
+  const handleDeletePhoto = (photoId: string) => {
+    if (confirm('确定要删除这张照片吗？')) {
+      deleteVenuePhoto(photoId);
+    }
+  };
 
   const castMembers = personnel.filter((p) => p.type === 'cast');
   const crewMembers = personnel.filter((p) => p.type === 'crew');
@@ -158,7 +375,10 @@ export default function ShowDetailPage() {
               <Copy className="w-4 h-4" />
               复制配置
             </button>
-            <button className="btn-primary flex items-center gap-2">
+            <button
+              onClick={handleOpenEdit}
+              className="btn-primary flex items-center gap-2"
+            >
               <Edit3 className="w-4 h-4" />
               编辑场次
             </button>
@@ -265,7 +485,10 @@ export default function ShowDetailPage() {
                   icon={<Image className="w-5 h-5 text-gold-500" />}
                   title="场地照片"
                   action={
-                    <button className="btn-ghost text-sm flex items-center gap-1">
+                    <button
+                      onClick={handleOpenAddPhoto}
+                      className="btn-ghost text-sm flex items-center gap-1"
+                    >
                       <Plus className="w-4 h-4" />
                       上传照片
                     </button>
@@ -273,25 +496,38 @@ export default function ShowDetailPage() {
                 />
               </CardHeader>
               <CardBody>
-                <div className="grid grid-cols-4 gap-3">
-                  {photos.map((photo) => (
-                    <div
-                      key={photo.id}
-                      className="group relative aspect-video rounded-md overflow-hidden cursor-pointer"
-                    >
-                      <img
-                        src={photo.url}
-                        alt={photo.description}
-                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                        <p className="absolute bottom-2 left-2 text-xs text-white">
-                          {photo.description}
-                        </p>
+                {photos.length > 0 ? (
+                  <div className="grid grid-cols-4 gap-3">
+                    {photos.map((photo) => (
+                      <div
+                        key={photo.id}
+                        className="group relative aspect-video rounded-md overflow-hidden"
+                      >
+                        <img
+                          src={photo.url}
+                          alt={photo.description}
+                          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                          <p className="absolute bottom-2 left-2 text-xs text-white">
+                            {photo.description}
+                          </p>
+                          <button
+                            onClick={() => handleDeletePhoto(photo.id)}
+                            className="absolute top-2 right-2 p-1 bg-red-500/80 text-white rounded hover:bg-red-600 transition-colors"
+                            title="删除"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-charcoal-400 text-center py-8">
+                    暂无场地照片，点击右上角添加
+                  </p>
+                )}
               </CardBody>
             </Card>
           </div>
@@ -413,7 +649,10 @@ export default function ShowDetailPage() {
                 icon={<Star className="w-5 h-5 text-gold-500" />}
                 title="演员名单"
                 action={
-                  <button className="btn-ghost text-sm flex items-center gap-1">
+                  <button
+                    onClick={() => handleOpenAddPersonnel('cast')}
+                    className="btn-ghost text-sm flex items-center gap-1"
+                  >
                     <Plus className="w-4 h-4" />
                     添加
                   </button>
@@ -421,7 +660,11 @@ export default function ShowDetailPage() {
               />
             </CardHeader>
             <CardBody>
-              <PersonnelList list={castMembers} />
+              <PersonnelList
+                list={castMembers}
+                onEdit={handleOpenEditPersonnel}
+                onDelete={handleDeletePersonnel}
+              />
             </CardBody>
           </Card>
 
@@ -431,7 +674,10 @@ export default function ShowDetailPage() {
                 icon={<Settings className="w-5 h-5 text-gold-500" />}
                 title="工作人员"
                 action={
-                  <button className="btn-ghost text-sm flex items-center gap-1">
+                  <button
+                    onClick={() => handleOpenAddPersonnel('crew')}
+                    className="btn-ghost text-sm flex items-center gap-1"
+                  >
                     <Plus className="w-4 h-4" />
                     添加
                   </button>
@@ -439,7 +685,11 @@ export default function ShowDetailPage() {
               />
             </CardHeader>
             <CardBody>
-              <PersonnelList list={crewMembers} />
+              <PersonnelList
+                list={crewMembers}
+                onEdit={handleOpenEditPersonnel}
+                onDelete={handleDeletePersonnel}
+              />
             </CardBody>
           </Card>
         </div>
@@ -447,21 +697,24 @@ export default function ShowDetailPage() {
 
       {activeTab === 'equipment' && (
         <div className="space-y-6">
-          {Object.entries(equipmentByCategory).map(([category, items]) =>
-            items.length > 0 ? (
-              <Card key={category}>
-                <CardHeader>
-                  <SectionTitle
-                    title={categoryLabels[category as EquipmentCategory]}
-                    action={
-                      <button className="btn-ghost text-sm flex items-center gap-1">
-                        <Plus className="w-4 h-4" />
-                        添加
-                      </button>
-                    }
-                  />
-                </CardHeader>
-                <CardBody>
+          {(['lighting', 'sound', 'stage', 'video', 'other'] as EquipmentCategory[]).map((category) => (
+            <Card key={category}>
+              <CardHeader>
+                <SectionTitle
+                  title={categoryLabels[category]}
+                  action={
+                    <button
+                      onClick={() => handleOpenAddEquipment(category)}
+                      className="btn-ghost text-sm flex items-center gap-1"
+                    >
+                      <Plus className="w-4 h-4" />
+                      添加
+                    </button>
+                  }
+                />
+              </CardHeader>
+              <CardBody>
+                {equipmentByCategory[category].length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full">
                       <thead>
@@ -470,13 +723,14 @@ export default function ShowDetailPage() {
                           <th className="pb-2 font-medium text-center">数量</th>
                           <th className="pb-2 font-medium">提供方</th>
                           <th className="pb-2 font-medium">备注</th>
+                          <th className="pb-2 font-medium text-right">操作</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {items.map((item) => (
+                        {equipmentByCategory[category].map((item) => (
                           <tr
                             key={item.id}
-                            className="border-b border-gold-50 last:border-0"
+                            className="border-b border-gold-50 last:border-0 hover:bg-cream-50/50 transition-colors"
                           >
                             <td className="py-3 text-sm text-charcoal-700">
                               {item.name}
@@ -490,15 +744,37 @@ export default function ShowDetailPage() {
                             <td className="py-3 text-sm text-charcoal-500">
                               {item.note || '-'}
                             </td>
+                            <td className="py-3 text-sm text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <button
+                                  onClick={() => handleOpenEditEquipment(item)}
+                                  className="p-1 text-charcoal-400 hover:text-wine-600 transition-colors"
+                                  title="编辑"
+                                >
+                                  <Pencil className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteEquipment(item.id)}
+                                  className="p-1 text-charcoal-400 hover:text-red-500 transition-colors"
+                                  title="删除"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                </CardBody>
-              </Card>
-            ) : null
-          )}
+                ) : (
+                  <p className="text-sm text-charcoal-400 text-center py-4">
+                    暂无设备，点击右上角添加
+                  </p>
+                )}
+              </CardBody>
+            </Card>
+          ))}
         </div>
       )}
 
@@ -640,6 +916,481 @@ export default function ShowDetailPage() {
           </div>
         </div>
       </Modal>
+
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="编辑场次"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowEditModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleSaveEdit} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                城市
+              </label>
+              <input
+                type="text"
+                value={editShow.city}
+                onChange={(e) => setEditShow({ ...editShow, city: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                场馆
+              </label>
+              <input
+                type="text"
+                value={editShow.venue}
+                onChange={(e) => setEditShow({ ...editShow, venue: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              场馆地址
+            </label>
+            <input
+              type="text"
+              value={editShow.venueAddress}
+              onChange={(e) => setEditShow({ ...editShow, venueAddress: e.target.value })}
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                演出日期
+              </label>
+              <input
+                type="date"
+                value={editShow.date}
+                onChange={(e) => setEditShow({ ...editShow, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                  开始时间
+                </label>
+                <input
+                  type="time"
+                  value={editShow.startTime}
+                  onChange={(e) => setEditShow({ ...editShow, startTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                  结束时间
+                </label>
+                <input
+                  type="time"
+                  value={editShow.endTime}
+                  onChange={(e) => setEditShow({ ...editShow, endTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                进场时间
+              </label>
+              <input
+                type="text"
+                value={editShow.loadInTime}
+                onChange={(e) => setEditShow({ ...editShow, loadInTime: e.target.value })}
+                placeholder="如：2026-06-20 14:00"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                彩排时间
+              </label>
+              <input
+                type="text"
+                value={editShow.rehearsalTime}
+                onChange={(e) => setEditShow({ ...editShow, rehearsalTime: e.target.value })}
+                placeholder="如：2026-06-20 16:00"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                撤场时间
+              </label>
+              <input
+                type="text"
+                value={editShow.loadOutTime}
+                onChange={(e) => setEditShow({ ...editShow, loadOutTime: e.target.value })}
+                placeholder="如：2026-06-20 23:00"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                场馆对接人
+              </label>
+              <input
+                type="text"
+                value={editShow.venueContact}
+                onChange={(e) => setEditShow({ ...editShow, venueContact: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                联系电话
+              </label>
+              <input
+                type="tel"
+                value={editShow.venuePhone}
+                onChange={(e) => setEditShow({ ...editShow, venuePhone: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              备注
+            </label>
+            <textarea
+              value={editShow.notes}
+              onChange={(e) => setEditShow({ ...editShow, notes: e.target.value })}
+              rows={3}
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400 resize-none"
+            />
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                总票数
+              </label>
+              <input
+                type="number"
+                value={editShow.ticketTotal}
+                onChange={(e) => setEditShow({ ...editShow, ticketTotal: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                VIP票价（元）
+              </label>
+              <input
+                type="number"
+                value={editShow.ticketPriceVip}
+                onChange={(e) => setEditShow({ ...editShow, ticketPriceVip: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                普通票价（元）
+              </label>
+              <input
+                type="number"
+                value={editShow.ticketPriceStandard}
+                onChange={(e) => setEditShow({ ...editShow, ticketPriceStandard: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPersonnelModal}
+        onClose={() => setShowPersonnelModal(false)}
+        title={editingPersonnel ? '编辑人员' : '添加人员'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowPersonnelModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleSavePersonnel} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                类型
+              </label>
+              <select
+                value={personnelForm.type}
+                onChange={(e) =>
+                  setPersonnelForm({
+                    ...personnelForm,
+                    type: e.target.value as 'cast' | 'crew',
+                  })
+                }
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              >
+                <option value="cast">演员</option>
+                <option value="crew">工作人员</option>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              姓名 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={personnelForm.name}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, name: e.target.value })
+              }
+              placeholder="请输入姓名"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              角色/职位
+            </label>
+            <input
+              type="text"
+              value={personnelForm.role}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, role: e.target.value })
+              }
+              placeholder="如：主演、导演、灯光师"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              联系电话
+            </label>
+            <input
+              type="tel"
+              value={personnelForm.phone}
+              onChange={(e) =>
+                setPersonnelForm({ ...personnelForm, phone: e.target.value })
+              }
+              placeholder="请输入联系电话"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showEquipmentModal}
+        onClose={() => setShowEquipmentModal(false)}
+        title={editingEquipment ? '编辑设备' : '添加设备'}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowEquipmentModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleSaveEquipment} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                设备分类
+              </label>
+              <select
+                value={equipmentForm.category}
+                onChange={(e) =>
+                  setEquipmentForm({
+                    ...equipmentForm,
+                    category: e.target.value as EquipmentCategory,
+                  })
+                }
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              >
+                <option value="lighting">灯光设备</option>
+                <option value="sound">音响设备</option>
+                <option value="stage">舞台设备</option>
+                <option value="video">视频设备</option>
+                <option value="other">其他设备</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                提供方
+              </label>
+              <select
+                value={equipmentForm.providedBy}
+                onChange={(e) =>
+                  setEquipmentForm({
+                    ...equipmentForm,
+                    providedBy: e.target.value as 'venue' | 'tour' | 'rental',
+                  })
+                }
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              >
+                <option value="tour">自带</option>
+                <option value="venue">场馆提供</option>
+                <option value="rental">租赁</option>
+              </select>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                设备名称 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={equipmentForm.name}
+                onChange={(e) =>
+                  setEquipmentForm({ ...equipmentForm, name: e.target.value })
+                }
+                placeholder="如：摇头灯、无线麦"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                数量
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={equipmentForm.quantity}
+                onChange={(e) =>
+                  setEquipmentForm({
+                    ...equipmentForm,
+                    quantity: Number(e.target.value),
+                  })
+                }
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              备注
+            </label>
+            <input
+              type="text"
+              value={equipmentForm.note}
+              onChange={(e) =>
+                setEquipmentForm({ ...equipmentForm, note: e.target.value })
+              }
+              placeholder="特殊要求或说明"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        title="添加场地照片"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowPhotoModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleSavePhoto} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              图片链接 <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="url"
+              value={photoForm.url}
+              onChange={(e) =>
+                setPhotoForm({ ...photoForm, url: e.target.value })
+              }
+              placeholder="https://example.com/photo.jpg"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              照片描述
+            </label>
+            <input
+              type="text"
+              value={photoForm.description}
+              onChange={(e) =>
+                setPhotoForm({ ...photoForm, description: e.target.value })
+              }
+              placeholder="如：舞台全景、后台入口"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+          {photoForm.url && (
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                预览
+              </label>
+              <img
+                src={photoForm.url}
+                alt="预览"
+                className="w-full h-40 object-cover rounded-md border border-gold-200"
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -712,7 +1463,15 @@ function InfoItem({
   );
 }
 
-function PersonnelList({ list }: { list: Personnel[] }) {
+function PersonnelList({
+  list,
+  onEdit,
+  onDelete,
+}: {
+  list: Personnel[];
+  onEdit: (person: Personnel) => void;
+  onDelete: (id: string) => void;
+}) {
   return (
     <div className="space-y-2">
       {list.map((person) => (
@@ -727,11 +1486,32 @@ function PersonnelList({ list }: { list: Personnel[] }) {
             <p className="font-medium text-charcoal-700">{person.name}</p>
             <p className="text-xs text-charcoal-400">{person.role}</p>
           </div>
-          <span className="text-xs text-charcoal-400 opacity-0 group-hover:opacity-100 transition-opacity">
+          <span className="text-xs text-charcoal-400 hidden sm:block">
             {person.phone}
           </span>
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={() => onEdit(person)}
+              className="p-1 text-charcoal-400 hover:text-wine-600 transition-colors"
+              title="编辑"
+            >
+              <Pencil className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => onDelete(person.id)}
+              className="p-1 text-charcoal-400 hover:text-red-500 transition-colors"
+              title="删除"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       ))}
+      {list.length === 0 && (
+        <p className="text-sm text-charcoal-400 text-center py-4">
+          暂无人员，点击右上角添加
+        </p>
+      )}
     </div>
   );
 }

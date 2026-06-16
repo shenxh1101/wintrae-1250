@@ -14,14 +14,34 @@ import {
 import { useTourStore } from '../store/useTourStore';
 import { Card, CardBody, CardHeader, SectionTitle } from '../components/Card';
 import { ShowStatusBadge } from '../components/StatusBadge';
+import Modal from '../components/Modal';
 import type { Show } from '../types';
 
 export default function CalendarPage() {
   const navigate = useNavigate();
   const shows = useTourStore((state) => state.shows);
   const duplicateShow = useTourStore((state) => state.duplicateShow);
+  const addShow = useTourStore((state) => state.addShow);
 
   const [currentDate, setCurrentDate] = useState(new Date(2026, 5, 1));
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newShow, setNewShow] = useState({
+    city: '',
+    venue: '',
+    venueAddress: '',
+    venueContact: '',
+    venuePhone: '',
+    date: '',
+    startTime: '19:30',
+    endTime: '21:30',
+    loadInTime: '',
+    rehearsalTime: '',
+    loadOutTime: '',
+    ticketTotal: 300,
+    ticketPriceVip: 380,
+    ticketPriceStandard: 180,
+    status: 'pending' as const,
+  });
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -70,6 +90,35 @@ export default function CalendarPage() {
     const newId = duplicateShow(showId);
     if (newId) {
       navigate(`/shows/${newId}`);
+    }
+  };
+
+  const handleAddShow = () => {
+    if (newShow.city && newShow.venue && newShow.date) {
+      addShow({
+        ...newShow,
+        loadInTime: newShow.loadInTime || `${newShow.date} 14:00`,
+        rehearsalTime: newShow.rehearsalTime || `${newShow.date} 16:00`,
+        loadOutTime: newShow.loadOutTime || `${newShow.date} 23:00`,
+      });
+      setNewShow({
+        city: '',
+        venue: '',
+        venueAddress: '',
+        venueContact: '',
+        venuePhone: '',
+        date: '',
+        startTime: '19:30',
+        endTime: '21:30',
+        loadInTime: '',
+        rehearsalTime: '',
+        loadOutTime: '',
+        ticketTotal: 300,
+        ticketPriceVip: 380,
+        ticketPriceStandard: 180,
+        status: 'pending',
+      });
+      setShowAddModal(false);
     }
   };
 
@@ -283,7 +332,10 @@ export default function CalendarPage() {
 
           <Card>
             <CardBody>
-              <button className="w-full btn-primary flex items-center justify-center gap-2">
+              <button
+                onClick={() => setShowAddModal(true)}
+                className="w-full btn-primary flex items-center justify-center gap-2"
+              >
                 <Plus className="w-4 h-4" />
                 添加新场次
               </button>
@@ -291,6 +343,211 @@ export default function CalendarPage() {
           </Card>
         </div>
       </div>
+
+      <Modal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        title="添加新场次"
+        size="lg"
+        footer={
+          <div className="flex justify-end gap-2">
+            <button
+              onClick={() => setShowAddModal(false)}
+              className="btn-secondary"
+            >
+              取消
+            </button>
+            <button onClick={handleAddShow} className="btn-primary">
+              保存
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                城市 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={newShow.city}
+                onChange={(e) => setNewShow({ ...newShow, city: e.target.value })}
+                placeholder="如：上海"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                场馆 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={newShow.venue}
+                onChange={(e) => setNewShow({ ...newShow, venue: e.target.value })}
+                placeholder="如：上海大剧院"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-charcoal-700 mb-1">
+              场馆地址
+            </label>
+            <input
+              type="text"
+              value={newShow.venueAddress}
+              onChange={(e) => setNewShow({ ...newShow, venueAddress: e.target.value })}
+              placeholder="请输入场馆详细地址"
+              className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                演出日期 <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={newShow.date}
+                onChange={(e) => setNewShow({ ...newShow, date: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                  开始时间
+                </label>
+                <input
+                  type="time"
+                  value={newShow.startTime}
+                  onChange={(e) => setNewShow({ ...newShow, startTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                  结束时间
+                </label>
+                <input
+                  type="time"
+                  value={newShow.endTime}
+                  onChange={(e) => setNewShow({ ...newShow, endTime: e.target.value })}
+                  className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                进场时间
+              </label>
+              <input
+                type="datetime-local"
+                value={newShow.loadInTime}
+                onChange={(e) => setNewShow({ ...newShow, loadInTime: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                彩排时间
+              </label>
+              <input
+                type="datetime-local"
+                value={newShow.rehearsalTime}
+                onChange={(e) => setNewShow({ ...newShow, rehearsalTime: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                撤场时间
+              </label>
+              <input
+                type="datetime-local"
+                value={newShow.loadOutTime}
+                onChange={(e) => setNewShow({ ...newShow, loadOutTime: e.target.value })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                场馆对接人
+              </label>
+              <input
+                type="text"
+                value={newShow.venueContact}
+                onChange={(e) => setNewShow({ ...newShow, venueContact: e.target.value })}
+                placeholder="请输入对接人姓名"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                联系电话
+              </label>
+              <input
+                type="tel"
+                value={newShow.venuePhone}
+                onChange={(e) => setNewShow({ ...newShow, venuePhone: e.target.value })}
+                placeholder="请输入联系电话"
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+
+          <div className="gold-divider"></div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                总票数
+              </label>
+              <input
+                type="number"
+                value={newShow.ticketTotal}
+                onChange={(e) => setNewShow({ ...newShow, ticketTotal: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                VIP票价（元）
+              </label>
+              <input
+                type="number"
+                value={newShow.ticketPriceVip}
+                onChange={(e) => setNewShow({ ...newShow, ticketPriceVip: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-charcoal-700 mb-1">
+                普通票价（元）
+              </label>
+              <input
+                type="number"
+                value={newShow.ticketPriceStandard}
+                onChange={(e) => setNewShow({ ...newShow, ticketPriceStandard: Number(e.target.value) })}
+                className="w-full px-3 py-2 border border-gold-200 rounded-md bg-white focus:outline-none focus:border-wine-400 focus:ring-1 focus:ring-wine-400"
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

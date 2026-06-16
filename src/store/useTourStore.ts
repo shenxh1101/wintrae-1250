@@ -60,6 +60,7 @@ interface TourState {
   updateIssue: (id: string, updates: Partial<Issue>) => void;
 
   addVenuePhoto: (photo: Omit<VenuePhoto, 'id'>) => void;
+  deleteVenuePhoto: (id: string) => void;
 
   updateSettlement: (showId: string, updates: Partial<Settlement>) => void;
   archiveShow: (showId: string) => void;
@@ -84,10 +85,25 @@ export const useTourStore = create<TourState>()(
 
       setCurrentShowId: (id) => set({ currentShowId: id }),
 
-      addShow: (show) =>
+      addShow: (show) => {
+        const newShowId = generateId('show');
+        const newShow = { ...show, id: newShowId };
+        const newSettlement: Settlement = {
+          id: generateId('s'),
+          showId: newShowId,
+          actualBoxOffice: 0,
+          guaranteeFee: 0,
+          shareRatio: 50,
+          isArchived: false,
+          ticketSoldVip: 0,
+          ticketSoldStandard: 0,
+          expenses: 0,
+        };
         set((state) => ({
-          shows: [...state.shows, { ...show, id: generateId('show') }],
-        })),
+          shows: [...state.shows, newShow],
+          settlements: [...state.settlements, newSettlement],
+        }));
+      },
 
       updateShow: (id, updates) =>
         set((state) => ({
@@ -141,6 +157,16 @@ export const useTourStore = create<TourState>()(
             updatedAt: new Date().toISOString().slice(0, 16).replace('T', ' '),
           }));
 
+        const newIssues = state.issues
+          .filter((i) => i.showId === sourceId && !i.isKeyReminder)
+          .map((i) => ({
+            ...i,
+            id: generateId('i'),
+            showId: newShowId,
+            status: 'open' as const,
+            createdAt: new Date().toISOString().slice(0, 10),
+          }));
+
         const newSettlement: Settlement = {
           id: generateId('s'),
           showId: newShowId,
@@ -158,6 +184,7 @@ export const useTourStore = create<TourState>()(
           personnel: [...state.personnel, ...newPersonnel],
           equipment: [...state.equipment, ...newEquipment],
           materials: [...state.materials, ...newMaterials],
+          issues: [...state.issues, ...newIssues],
           settlements: [...state.settlements, newSettlement],
         }));
 
@@ -284,6 +311,11 @@ export const useTourStore = create<TourState>()(
             ...state.venuePhotos,
             { ...photo, id: generateId('v') },
           ],
+        })),
+
+      deleteVenuePhoto: (id) =>
+        set((state) => ({
+          venuePhotos: state.venuePhotos.filter((v) => v.id !== id),
         })),
 
       updateSettlement: (showId, updates) =>
